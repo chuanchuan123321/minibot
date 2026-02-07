@@ -30,6 +30,12 @@ cd Minibot
 pip install -e .
 ```
 
+## 演示截图
+
+![Minibot 运行界面](images/demo.png)
+
+> 💡 你可以在 `images/` 文件夹中放置运行后的截图
+
 ## 快速开始
 
 ### 1. 配置环境变量
@@ -95,6 +101,114 @@ python chat.py
 ===== JSON END =====
 ```
 
+### 示例 4：创建和修改配置文件
+
+```
+你: 创建一个 config.json 文件，包含应用配置信息
+
+接下来我要: 创建配置文件
+
+===== JSON START =====
+{"action": "execute_tool", "tool": "file_write", "params": {"path": "/path/to/config.json", "content": "{\"app_name\": \"MyApp\", \"version\": \"1.0.0\", \"debug\": true}"}}
+===== JSON END =====
+```
+
+### 示例 5：批量文件操作
+
+```
+你: 创建一个项目结构，包括 src、tests、docs 三个目录，并在 src 中创建 main.py 文件
+
+接下来我要: 创建项目目录结构
+
+===== JSON START =====
+{"action": "execute_tool", "tool": "dir_create", "params": {"path": "/path/to/project/src"}}
+===== JSON END =====
+
+接下来我要: 创建 tests 目录
+
+===== JSON START =====
+{"action": "execute_tool", "tool": "dir_create", "params": {"path": "/path/to/project/tests"}}
+===== JSON END =====
+
+接下来我要: 创建 docs 目录
+
+===== JSON START =====
+{"action": "execute_tool", "tool": "dir_create", "params": {"path": "/path/to/project/docs"}}
+===== JSON END =====
+
+接下来我要: 在 src 中创建 main.py 文件
+
+===== JSON START =====
+{"action": "execute_tool", "tool": "file_write", "params": {"path": "/path/to/project/src/main.py", "content": "#!/usr/bin/env python3\n\ndef main():\n    print('Hello, World!')\n\nif __name__ == '__main__':\n    main()"}}
+===== JSON END =====
+```
+
+### 示例 6：读取和修改现有文件
+
+```
+你: 读取 README.md 文件，然后在其中添加一个新的章节
+
+接下来我要: 读取 README.md 文件
+
+===== JSON START =====
+{"action": "execute_tool", "tool": "file_read", "params": {"path": "/path/to/README.md"}}
+===== JSON END =====
+
+接下来我要: 在文件末尾添加新章节
+
+===== JSON START =====
+{"action": "execute_tool", "tool": "file_write", "params": {"path": "/path/to/README.md", "content": "[原文件内容]\n\n## 新章节\n\n这是新添加的章节内容。"}}
+===== JSON END =====
+```
+
+### 示例 7：复杂工作流 - 生成项目文档
+
+```
+你: 创建一个完整的项目，包括源代码、测试文件和文档
+
+接下来我要: 创建项目根目录
+
+===== JSON START =====
+{"action": "execute_tool", "tool": "dir_create", "params": {"path": "/path/to/myproject"}}
+===== JSON END =====
+
+接下来我要: 创建源代码目录
+
+===== JSON START =====
+{"action": "execute_tool", "tool": "dir_create", "params": {"path": "/path/to/myproject/src"}}
+===== JSON END =====
+
+接下来我要: 创建 Python 模块
+
+===== JSON START =====
+{"action": "execute_tool", "tool": "file_write", "params": {"path": "/path/to/myproject/src/__init__.py", "content": "\"\"\"MyProject Package\"\"\"\n__version__ = '1.0.0'"}}
+===== JSON END =====
+
+接下来我要: 创建主模块
+
+===== JSON START =====
+{"action": "execute_tool", "tool": "file_write", "params": {"path": "/path/to/myproject/src/core.py", "content": "class Calculator:\n    def add(self, a, b):\n        return a + b\n    \n    def subtract(self, a, b):\n        return a - b"}}
+===== JSON END =====
+
+接下来我要: 创建项目 README
+
+===== JSON START =====
+{"action": "execute_tool", "tool": "file_write", "params": {"path": "/path/to/myproject/README.md", "content": "# MyProject\n\n一个示例项目\n\n## 功能\n\n- 加法\n- 减法\n\n## 使用方法\n\n```python\nfrom src.core import Calculator\ncalc = Calculator()\nprint(calc.add(1, 2))\n```"}}
+===== JSON END =====
+
+接下来我要: 创建测试目录
+
+===== JSON START =====
+{"action": "execute_tool", "tool": "dir_create", "params": {"path": "/path/to/myproject/tests"}}
+===== JSON END =====
+
+接下来我要: 创建测试文件
+
+===== JSON START =====
+{"action": "execute_tool", "tool": "file_write", "params": {"path": "/path/to/myproject/tests/test_core.py", "content": "import unittest\nfrom src.core import Calculator\n\nclass TestCalculator(unittest.TestCase):\n    def setUp(self):\n        self.calc = Calculator()\n    \n    def test_add(self):\n        self.assertEqual(self.calc.add(1, 2), 3)\n    \n    def test_subtract(self):\n        self.assertEqual(self.calc.subtract(5, 3), 2)"}}
+===== JSON END =====
+```
+
 ## 可用工具
 
 | 工具名 | 描述 | 参数 |
@@ -152,10 +266,15 @@ Minibot/
 │   │   └── file.py               # 文件工具
 │   └── ui/
 │       └── cli.py                # CLI 界面
+├── images/                        # 演示截图文件夹
+│   └── demo.png                  # 运行界面截图
+├── tests/                         # 测试文件
+│   └── test_agent.py
 ├── chat.py                        # 主程序
 ├── setup.py                       # 安装配置
 ├── requirements.txt               # 依赖列表
 ├── .env.example                   # 环境变量示例
+├── .gitignore                     # Git 忽略文件
 └── README.md                      # 本文件
 ```
 
