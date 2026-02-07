@@ -187,7 +187,7 @@ MIT License - 详见 LICENSE 文件
 
 ## 作者
 
-Your Name (your.email@example.com)
+chuan (2774421277@qq.com)
 
 ## 更新日志
 
