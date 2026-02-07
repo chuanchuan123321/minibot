@@ -53,17 +53,17 @@ pip install -e .
 # 使用 OpenAI API（推荐）
 API_BASE_URL=https://api.openai.com/v1
 API_KEY=sk-your_openai_api_key_here
-API_MODEL=gpt-4
+API_MODEL=gpt-5.2
 
 # 或使用其他 API 服务（如 Anthropic、国内服务等）
 # API_BASE_URL=https://api.anthropic.com
 # API_KEY=your_api_key_here
-# API_MODEL=claude-3-opus-20240229
+# API_MODEL=claude-sonnet-4-5-20250929
 
 # 或使用国内 API 服务
 # API_BASE_URL=https://yunwu.ai
 # API_KEY=your_api_key_here
-# API_MODEL=claude-haiku-4-5-20251001
+# API_MODEL=claude-sonnet-4-5-20250929
 
 TAVILY_API_KEY=tvly-your_tavily_api_key_here
 MAX_TOKENS=4096
