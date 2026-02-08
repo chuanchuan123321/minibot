@@ -417,7 +417,7 @@ Email: 2774421277@qq.com
 
 ## Changelog
 
-### v1.1.0 (2025-02-07)
+### v1.1.0 (2025-02-08)
 - ✨ Added file sending to Feishu (Gateway Mode)
 - ✨ Added image upload support (JPG, PNG, GIF, WebP, BMP)
 - ✨ Real-time task progress updates via Feishu
