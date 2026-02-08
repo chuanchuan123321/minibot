@@ -36,13 +36,7 @@ An ultra-lightweight AI automation tool that can execute various tasks in the te
 
 ## Installation
 
-### Method 1: Install from PyPI (Recommended)
-
-```bash
-pip install Minibot
-```
-
-### Method 2: Install from Source
+### Install from Source
 
 ```bash
 git clone https://github.com/chuanchuan123321/Minibot.git

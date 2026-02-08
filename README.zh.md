@@ -36,16 +36,10 @@
 
 ## 安装
 
-### 方式一：从 PyPI 安装（推荐）
+### 从源代码安装
 
 ```bash
-pip install Minibot
-```
-
-### 方式二：从源代码安装
-
-```bash
-git clone https://github.com/yourusername/Minibot.git
+git clone https://github.com/chuanchuan123321/Minibot.git
 cd Minibot
 pip install -e .
 ```
