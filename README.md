@@ -113,11 +113,50 @@ python chat.py gateway
 - 📤 Send files directly to Feishu
 - ✅ Interactive command approval via Feishu
 
-**Setup:**
-1. Configure Feishu App ID and Secret in `~/.minibot/config.json`
-2. Enable Bot capability in Feishu Open Platform
-3. Subscribe to `im.message.receive_v1` event
-4. Run: `python chat.py gateway`
+**Setup Instructions:**
+
+#### Step 1: Create Feishu Application
+
+1. Visit [Feishu Open Platform](https://open.feishu.cn)
+2. Create a new application
+3. Get your **App ID** and **App Secret** from application details
+
+#### Step 2: Configure Minibot
+
+Edit `~/.minibot/config.json`:
+
+```json
+{
+  "channels": {
+    "feishu": {
+      "enabled": true,
+      "appId": "your_app_id_here",
+      "appSecret": "your_app_secret_here"
+    }
+  }
+}
+```
+
+**Configuration Fields:**
+- `enabled`: Set to `true` to enable Feishu
+- `appId`: Your Feishu application ID
+- `appSecret`: Your Feishu application secret
+
+#### Step 3: Enable Bot Capability
+
+1. In Feishu Open Platform → Application Details
+2. Enable **Bot** capability
+3. Run gateway mode first: `python chat.py gateway`
+4. Then subscribe to `im.message.receive_v1` event in Feishu Open Platform
+5. The bot will automatically establish WebSocket long connection
+
+#### Step 4: Run Gateway Mode
+
+```bash
+python chat.py gateway
+```
+
+The bot will now receive messages from Feishu and respond in real-time!
 
 ## Usage Examples
 
