@@ -11,6 +11,9 @@ class FeishuConfig(BaseModel):
     enabled: bool = False
     app_id: str = Field(default="", alias="appId")  # App ID from Feishu Open Platform
     app_secret: str = Field(default="", alias="appSecret")  # App Secret from Feishu Open Platform
+    encrypt_key: str = Field(default="", alias="encryptKey")  # Encrypt Key for event subscription (optional)
+    verification_token: str = Field(default="", alias="verificationToken")  # Verification Token for event subscription (optional)
+    allow_from: list[str] = Field(default_factory=list, alias="allowFrom")  # Allowed user open_ids
 
 
 class ChannelsConfig(BaseModel):

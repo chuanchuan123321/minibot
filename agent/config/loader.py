@@ -6,6 +6,13 @@ from pathlib import Path
 
 from agent.config.schema import Config
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 
 def get_config_path() -> Path:
     """Get the configuration file path."""
@@ -16,7 +23,13 @@ def get_config_path() -> Path:
 
 def load_config(config_path: str | None = None) -> Config:
     """
-    Load configuration from file.
+    Load configuration from file and environment variables.
+
+    Environment variables override config file values:
+    - FEISHU_APP_ID: Feishu App ID
+    - FEISHU_APP_SECRET: Feishu App Secret
+    - FEISHU_ENCRYPT_KEY: Feishu Encrypt Key
+    - FEISHU_VERIFICATION_TOKEN: Feishu Verification Token
 
     Args:
         config_path: Path to config file. If None, uses default location.
@@ -31,16 +44,30 @@ def load_config(config_path: str | None = None) -> Config:
 
     if not config_file.exists():
         # Return default config
-        return Config()
+        config = Config()
+    else:
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            config = Config(**data)
+        except Exception as e:
+            print(f"⚠️  Error loading config from {config_path}: {e}")
+            print("Using default configuration")
+            config = Config()
 
-    try:
-        with open(config_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return Config(**data)
-    except Exception as e:
-        print(f"⚠️  Error loading config from {config_path}: {e}")
-        print("Using default configuration")
-        return Config()
+    # Override with environment variables
+    if os.getenv("FEISHU_ENABLED", "").lower() == "true":
+        config.channels.feishu.enabled = True
+    if os.getenv("FEISHU_APP_ID"):
+        config.channels.feishu.app_id = os.getenv("FEISHU_APP_ID")
+    if os.getenv("FEISHU_APP_SECRET"):
+        config.channels.feishu.app_secret = os.getenv("FEISHU_APP_SECRET")
+    if os.getenv("FEISHU_ENCRYPT_KEY"):
+        config.channels.feishu.encrypt_key = os.getenv("FEISHU_ENCRYPT_KEY")
+    if os.getenv("FEISHU_VERIFICATION_TOKEN"):
+        config.channels.feishu.verification_token = os.getenv("FEISHU_VERIFICATION_TOKEN")
+
+    return config
 
 
 def save_config(config: Config, config_path: str | None = None) -> bool:

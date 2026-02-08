@@ -78,6 +78,11 @@ API_MODEL=gpt-4
 TAVILY_API_KEY=your_tavily_key_here
 MAX_TOKENS=4096
 TEMPERATURE=0.7
+
+# Feishu Configuration (Optional)
+FEISHU_ENABLED=false
+FEISHU_APP_ID=your_feishu_app_id
+FEISHU_APP_SECRET=your_feishu_app_secret
 ```
 
 Supported API services:

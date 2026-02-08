@@ -114,49 +114,15 @@ python chat.py gateway
 - ✅ 通过飞书进行交互式命令审批
 
 **设置步骤：**
-
-#### 第一步：创建飞书应用
-
-1. 访问 [飞书开放平台](https://open.feishu.cn)
-2. 创建一个新应用
-3. 从应用详情中获取 **App ID** 和 **App Secret**
-
-#### 第二步：配置 Minibot
-
-编辑 `~/.minibot/config.json`：
-
-```json
-{
-  "channels": {
-    "feishu": {
-      "enabled": true,
-      "appId": "your_app_id_here",
-      "appSecret": "your_app_secret_here"
-    }
-  }
-}
-```
-
-**配置字段说明：**
-- `enabled`: 设置为 `true` 启用飞书
-- `appId`: 你的飞书应用 ID
-- `appSecret`: 你的飞书应用密钥
-
-#### 第三步：启用 Bot 能力
-
-1. 在飞书开放平台 → 应用详情中
-2. 启用 **Bot** 能力
-3. 先运行网关模式：`python chat.py gateway`
-4. 然后在飞书开放平台订阅 `im.message.receive_v1` 事件
-5. Bot 将自动建立 WebSocket 长连接
-
-#### 第四步：运行网关模式
-
-```bash
-python chat.py gateway
-```
-
-现在 Bot 将接收来自飞书的消息并实时响应！
+1. 在 `.env` 文件中配置飞书凭证：
+   ```bash
+   FEISHU_ENABLED=true
+   FEISHU_APP_ID=your_app_id
+   FEISHU_APP_SECRET=your_app_secret
+   ```
+2. 在飞书开放平台启用 Bot 能力
+3. 订阅 `im.message.receive_v1` 事件
+4. 运行：`python chat.py gateway`
 
 ## 使用示例
 
