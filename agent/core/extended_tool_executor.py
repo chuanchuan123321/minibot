@@ -4,6 +4,7 @@ from typing import Dict, Any, Callable, Optional
 from agent.tools.shell import ShellTool
 from agent.tools.file import FileTool
 from agent.tools.time_tool import TimeTool
+from agent.tools.pdf_tool import PDFTool
 import os
 import requests
 
@@ -14,6 +15,7 @@ class ExtendedToolExecutor:
     def __init__(self):
         self.shell_tool = ShellTool()
         self.file_tool = FileTool()
+        self.pdf_tool = PDFTool()
         self.tools: Dict[str, Callable] = {
             "shell": self.execute_shell,
             "file_read": self.execute_file_read,
@@ -33,6 +35,8 @@ class ExtendedToolExecutor:
             "web_search": self.execute_web_search,
             "read_url": self.execute_read_url,
             "set_timer": self.execute_set_timer,
+            "send_file": self.execute_send_file,
+            "generate_pdf": self.execute_generate_pdf,
         }
 
     def get_available_tools(self) -> list:
@@ -127,6 +131,16 @@ class ExtendedToolExecutor:
                 "name": "set_timer",
                 "description": "Set a timer that will trigger after specified minutes",
                 "params": "minutes (number): Minutes to wait, message (string): Message to display when timer ends"
+            },
+            {
+                "name": "send_file",
+                "description": "Send a file to the user via Feishu",
+                "params": "path (string): Path to the file to send"
+            },
+            {
+                "name": "generate_pdf",
+                "description": "Generate PDF from Markdown, text, HTML, or Word documents",
+                "params": "input_path (string): Input file path, output_path (string): Output PDF file path, format (string): Input format (markdown/text/html/docx)"
             },
         ]
 
@@ -529,3 +543,93 @@ class ExtendedToolExecutor:
 
         except Exception as e:
             return f"Error: 设置定时器失败 - {str(e)}"
+
+    def execute_send_file(self, params: Dict[str, Any]) -> str:
+        """Send a file to the user via Feishu"""
+        import asyncio
+        from agent.bus.events import OutboundMessage
+
+        file_path = params.get("path", "")
+
+        if not file_path:
+            return "Error: 必须指定文件路径"
+
+        import os
+        if not os.path.isfile(file_path):
+            return f"Error: 文件不存在 - {file_path}"
+
+        # Get the current executor context to access bus and chat info
+        # This is a bit hacky but necessary for the current architecture
+        import inspect
+        frame = inspect.currentframe()
+        executor = None
+
+        # Walk up the stack to find NaturalTaskExecutor
+        while frame:
+            if 'self' in frame.f_locals:
+                obj = frame.f_locals['self']
+                if hasattr(obj, 'bus') and hasattr(obj, 'current_chat_id'):
+                    executor = obj
+                    break
+            frame = frame.f_back
+
+        if not executor or not executor.bus or not executor.current_chat_id:
+            return "Error: 无法发送文件 - 未在网关模式下运行"
+
+        try:
+            # Create outbound message with file path
+            msg = OutboundMessage(
+                channel=executor.current_channel or "feishu",
+                chat_id=executor.current_chat_id,
+                content=file_path,  # Pass file path as content
+            )
+
+            # Send via bus (non-blocking)
+            asyncio.create_task(executor.bus.publish_outbound(msg))
+
+            file_name = os.path.basename(file_path)
+            file_size = os.path.getsize(file_path)
+            return f"✅ 文件已发送: {file_name} ({file_size} bytes)"
+
+        except Exception as e:
+            return f"Error: 发送文件失败 - {str(e)}"
+
+    def execute_generate_pdf(self, params: Dict[str, Any]) -> str:
+        """Generate PDF from various formats"""
+        input_path = params.get("input_path", "")
+        output_path = params.get("output_path", "")
+        format_type = params.get("format", "")
+
+        # Parameter validation
+        if not input_path or not output_path:
+            return "Error: input_path and output_path parameters required"
+
+        # Auto-detect format from file extension if not specified
+        if not format_type:
+            if input_path.lower().endswith('.md'):
+                format_type = "markdown"
+            elif input_path.lower().endswith('.html'):
+                format_type = "html"
+            elif input_path.lower().endswith('.docx') or input_path.lower().endswith('.doc'):
+                format_type = "docx"
+            else:
+                format_type = "text"
+
+        if format_type not in ["markdown", "text", "html", "docx"]:
+            return f"Error: Unsupported format '{format_type}'. Supported: markdown, text, html, docx"
+
+        # Path expansion
+        expanded_input = FileTool.expand_path(input_path)
+        expanded_output = FileTool.expand_path(output_path)
+
+        # Call PDF tool
+        success, message = self.pdf_tool.generate_pdf(
+            expanded_input,
+            expanded_output,
+            format_type
+        )
+
+        if success:
+            return f"✅ {message}"
+        else:
+            return message

@@ -31,6 +31,8 @@ An ultra-lightweight AI automation tool that can execute various tasks in the te
 - 🌐 URL Content Reading - Automatically extract web page content
 - ⏰ Timer - Set scheduled tasks
 - ✅ Command Approval - Interactive command confirmation
+- 📤 **File Sending** - Send files to Feishu (Gateway Mode)
+- 💬 **Feishu Integration** - Real-time task progress updates via Feishu
 
 ## Installation
 
@@ -96,6 +98,26 @@ Or run directly:
 ```bash
 python chat.py
 ```
+
+### 3. Gateway Mode (Feishu Integration)
+
+Run in gateway mode to receive tasks from Feishu and send real-time updates:
+
+```bash
+python chat.py gateway
+```
+
+**Gateway Mode Features:**
+- 📨 Receive tasks from Feishu
+- 🤖 Real-time progress updates
+- 📤 Send files directly to Feishu
+- ✅ Interactive command approval via Feishu
+
+**Setup:**
+1. Configure Feishu App ID and Secret in `~/.minibot/config.json`
+2. Enable Bot capability in Feishu Open Platform
+3. Subscribe to `im.message.receive_v1` event
+4. Run: `python chat.py gateway`
 
 ## Usage Examples
 
@@ -259,6 +281,7 @@ Next I will: Create test file
 | `web_search` | Search the web | `query` |
 | `read_url` | Read URL content | `url` |
 | `set_timer` | Set timer | `minutes`, `message` |
+| `send_file` | Send file to Feishu | `path` (Gateway Mode only) |
 
 ## Configuration
 
@@ -285,7 +308,22 @@ Minibot --config /path/to/.env
 
 # Run specific task
 Minibot "Your task description"
+
+# Clear conversation history
+/clear
+
+# Stop current task (Gateway mode only)
+/stop
 ```
+
+### Command Reference
+
+| Command | Mode | Function |
+|---------|------|----------|
+| `/clear` | CLI & Gateway | Clear conversation and execution history |
+| `/stop` | Gateway Mode | Stop the currently executing task |
+| `Ctrl+C` | CLI | Interrupt current task |
+| `exit` / `quit` | CLI | Exit the program |
 
 ## Project Structure
 
@@ -297,18 +335,28 @@ Minibot/
 │   │   └── extended_tool_executor.py  # Tool Executor
 │   ├── tools/
 │   │   ├── shell.py              # Shell Tool
-│   │   └── file.py               # File Tool
+│   │   ├── file.py               # File Tool
+│   │   └── time_tool.py          # Time Tool
+│   ├── channels/
+│   │   ├── base.py               # Base Channel
+│   │   ├── feishu.py             # Feishu Integration
+│   │   └── manager.py            # Channel Manager
+│   ├── bus/
+│   │   ├── queue.py              # Message Queue
+│   │   └── events.py             # Event Definitions
+│   ├── config/
+│   │   ├── loader.py             # Config Loader
+│   │   └── schema.py             # Config Schema
 │   └── ui/
 │       └── cli.py                # CLI Interface
 ├── images/                        # Demo screenshots folder
 │   └── demo.png                  # Interface screenshot
-├── tests/                         # Test files
-│   └── test_agent.py
 ├── chat.py                        # Main program
 ├── setup.py                       # Installation configuration
 ├── requirements.txt               # Dependencies list
 ├── .env.example                   # Environment variables example
 ├── .gitignore                     # Git ignore file
+├── CLAUDE.md                      # Claude Code Guide
 ├── LICENSE                        # MIT License
 └── README.md                      # This file
 ```
@@ -328,7 +376,11 @@ A: Visit https://tavily.com to register and get your API key.
 
 ### Q: What file formats are supported?
 
-A: Supports PDF, Word (.docx/.doc), Markdown, JSON, plain text, and other formats.
+A: Supports multiple file formats:
+- **Documents**: PDF, Word (.docx/.doc), Excel (.xls/.xlsx), Markdown, JSON, plain text
+- **Images**: JPG, JPEG, PNG, GIF, WebP, BMP (up to 10 MB, max resolution 12000x12000)
+- **Media**: MP4 video, OPUS audio
+- **Other**: Any binary file format (up to 30 MB)
 
 ### Q: How do I disable command approval?
 
@@ -359,6 +411,15 @@ MIT License - See LICENSE file for details
 Email: 2774421277@qq.com
 
 ## Changelog
+
+### v1.1.0 (2025-02-07)
+- ✨ Added file sending to Feishu (Gateway Mode)
+- ✨ Added image upload support (JPG, PNG, GIF, WebP, BMP)
+- ✨ Real-time task progress updates via Feishu
+- ✨ Added `/clear` command to clear conversation history
+- 🐛 Improved JSON parsing with better quote handling
+- 🐛 Fixed terminal UI scrolling issue in approval menu
+- 📝 Updated documentation
 
 ### v1.0.0 (2025-02-07)
 - Initial release

@@ -31,6 +31,8 @@
 - 🌐 URL 内容读取 - 自动提取网页内容
 - ⏰ 定时器 - 设置定时任务
 - ✅ 命令审批 - 交互式命令确认
+- 📤 **文件发送** - 发送文件到飞书（网关模式）
+- 💬 **飞书集成** - 实时任务进度更新
 
 ## 安装
 
@@ -96,6 +98,26 @@ Minibot
 ```bash
 python chat.py
 ```
+
+### 3. 网关模式（飞书集成）
+
+在网关模式下运行，从飞书接收任务并发送实时更新：
+
+```bash
+python chat.py gateway
+```
+
+**网关模式功能：**
+- 📨 从飞书接收任务
+- 🤖 实时进度更新
+- 📤 直接发送文件到飞书
+- ✅ 通过飞书进行交互式命令审批
+
+**设置步骤：**
+1. 在 `~/.minibot/config.json` 中配置飞书 App ID 和 Secret
+2. 在飞书开放平台启用 Bot 能力
+3. 订阅 `im.message.receive_v1` 事件
+4. 运行：`python chat.py gateway`
 
 ## 使用示例
 
@@ -259,6 +281,7 @@ python chat.py
 | `web_search` | 搜索网页 | `query` |
 | `read_url` | 读取 URL 内容 | `url` |
 | `set_timer` | 设置定时器 | `minutes`, `message` |
+| `send_file` | 发送文件到飞书 | `path`（仅网关模式） |
 
 ## 配置说明
 
@@ -285,7 +308,22 @@ Minibot --config /path/to/.env
 
 # 运行特定任务
 Minibot "你的任务描述"
+
+# 清除对话历史
+/clear
+
+# 停止当前任务（仅网关模式）
+/stop
 ```
+
+### 命令说明
+
+| 命令 | 模式 | 功能 |
+|------|------|------|
+| `/clear` | CLI & 网关 | 清除对话历史和执行历史 |
+| `/stop` | 网关模式 | 停止当前正在执行的任务 |
+| `Ctrl+C` | CLI | 中断当前任务 |
+| `exit` / `quit` | CLI | 退出程序 |
 
 ## 项目结构
 
@@ -297,18 +335,29 @@ Minibot/
 │   │   └── extended_tool_executor.py  # 工具执行器
 │   ├── tools/
 │   │   ├── shell.py              # Shell 工具
-│   │   └── file.py               # 文件工具
+│   │   ├── file.py               # 文件工具
+│   │   └── time_tool.py          # 时间工具
+│   ├── channels/
+│   │   ├── base.py               # 通道基类
+│   │   ├── feishu.py             # 飞书集成
+│   │   └── manager.py            # 通道管理器
+│   ├── bus/
+│   │   ├── queue.py              # 消息队列
+│   │   └── events.py             # 事件定义
+│   ├── config/
+│   │   ├── loader.py             # 配置加载器
+│   │   └── schema.py             # 配置模式
 │   └── ui/
 │       └── cli.py                # CLI 界面
 ├── images/                        # 演示截图文件夹
 │   └── demo.png                  # 运行界面截图
-├── tests/                         # 测试文件
-│   └── test_agent.py
 ├── chat.py                        # 主程序
 ├── setup.py                       # 安装配置
 ├── requirements.txt               # 依赖列表
 ├── .env.example                   # 环境变量示例
 ├── .gitignore                     # Git 忽略文件
+├── CLAUDE.md                      # Claude Code 指南
+├── LICENSE                        # 许可证
 └── README.md                      # 本文件
 ```
 
@@ -327,7 +376,11 @@ A: 访问 https://tavily.com 注册并获取 API 密钥。
 
 ### Q: 支持哪些文件格式？
 
-A: 支持 PDF、Word (.docx/.doc)、Markdown、JSON、纯文本等格式。
+A: 支持多种文件格式：
+- **文档**: PDF、Word (.docx/.doc)、Excel (.xls/.xlsx)、Markdown、JSON、纯文本
+- **图片**: JPG、JPEG、PNG、GIF、WebP、BMP（最大 10 MB，分辨率不超过 12000x12000）
+- **媒体**: MP4 视频、OPUS 音频
+- **其他**: 任何二进制文件格式（最大 30 MB）
 
 ### Q: 如何禁用命令审批？
 
@@ -359,7 +412,16 @@ chuan (2774421277@qq.com)
 
 ## 更新日志
 
-### v1.0.0 (2024-02-07)
+### v1.1.0 (2025-02-07)
+- ✨ 添加文件发送到飞书功能（网关模式）
+- ✨ 添加图片上传支持（JPG、PNG、GIF、WebP、BMP）
+- ✨ 实时任务进度更新
+- ✨ 添加 `/clear` 命令清除对话历史
+- 🐛 改进 JSON 解析，更好地处理引号转义
+- 🐛 修复终端 UI 滚动问题
+- 📝 更新文档
+
+### v1.0.0 (2025-02-07)
 - 初始版本发布
 - 支持基本的任务执行
 - 集成网页搜索和 URL 读取
