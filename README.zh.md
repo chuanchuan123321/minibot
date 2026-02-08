@@ -50,9 +50,15 @@ pip install -e .
 
 ## 快速开始
 
-### 1. 配置环境变量
+### 1. 配置环境变量（必需）
 
-创建 `.env` 文件：
+复制 `.env.example` 到 `.env` 并填入你的 API 凭证：
+
+```bash
+cp .env.example .env
+```
+
+编辑 `.env` 文件，填入你的 API 密钥：
 
 ```bash
 # 使用 OpenAI API（推荐）
@@ -82,12 +88,6 @@ TEMPERATURE=0.7
 - ✅ 其他兼容 OpenAI 格式的 API
 
 ### 2. 运行 Minibot
-
-```bash
-Minibot
-```
-
-或者直接运行：
 
 ```bash
 python chat.py
@@ -295,25 +295,6 @@ python chat.py gateway
 
 - **MAX_TOKENS**: 最大 token 数
 - **TEMPERATURE**: 温度参数（0-1）
-
-## 命令行选项
-
-```bash
-# 显示帮助信息
-Minibot --help
-
-# 指定配置文件
-Minibot --config /path/to/.env
-
-# 运行特定任务
-Minibot "你的任务描述"
-
-# 清除对话历史
-/clear
-
-# 停止当前任务（仅网关模式）
-/stop
-```
 
 ### 命令说明
 

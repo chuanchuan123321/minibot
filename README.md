@@ -50,9 +50,15 @@ pip install -e .
 
 ## Quick Start
 
-### 1. Configure Environment Variables
+### 1. Configure Environment Variables (Required)
 
-Create a `.env` file:
+Copy `.env.example` to `.env` and fill in your API credentials:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` file with your API keys:
 
 ```bash
 # Using OpenAI API (Recommended)
@@ -84,7 +90,7 @@ TEMPERATURE=0.7
 ### 2. Run Minibot
 
 ```bash
-Minibot
+python chat.py
 ```
 
 Or run directly:
@@ -295,25 +301,6 @@ Next I will: Create test file
 
 - **MAX_TOKENS**: Maximum number of tokens
 - **TEMPERATURE**: Temperature parameter (0-1)
-
-## Command Line Options
-
-```bash
-# Show help information
-Minibot --help
-
-# Specify configuration file
-Minibot --config /path/to/.env
-
-# Run specific task
-Minibot "Your task description"
-
-# Clear conversation history
-/clear
-
-# Stop current task (Gateway mode only)
-/stop
-```
 
 ### Command Reference
 
