@@ -335,7 +335,8 @@ Minibot/
 │   ├── tools/
 │   │   ├── shell.py              # Shell 工具
 │   │   ├── file.py               # 文件工具
-│   │   └── time_tool.py          # 时间工具
+│   │   ├── time_tool.py          # 时间工具
+│   │   └── pdf_tool.py           # PDF 生成工具
 │   ├── channels/
 │   │   ├── base.py               # 通道基类
 │   │   ├── feishu.py             # 飞书集成
@@ -355,7 +356,6 @@ Minibot/
 ├── requirements.txt               # 依赖列表
 ├── .env.example                   # 环境变量示例
 ├── .gitignore                     # Git 忽略文件
-├── CLAUDE.md                      # Claude Code 指南
 ├── LICENSE                        # 许可证
 └── README.md                      # 本文件
 ```

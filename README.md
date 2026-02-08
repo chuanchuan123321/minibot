@@ -335,7 +335,8 @@ Minibot/
 │   ├── tools/
 │   │   ├── shell.py              # Shell Tool
 │   │   ├── file.py               # File Tool
-│   │   └── time_tool.py          # Time Tool
+│   │   ├── time_tool.py          # Time Tool
+│   │   └── pdf_tool.py           # PDF Generation Tool
 │   ├── channels/
 │   │   ├── base.py               # Base Channel
 │   │   ├── feishu.py             # Feishu Integration
@@ -355,7 +356,6 @@ Minibot/
 ├── requirements.txt               # Dependencies list
 ├── .env.example                   # Environment variables example
 ├── .gitignore                     # Git ignore file
-├── CLAUDE.md                      # Claude Code Guide
 ├── LICENSE                        # MIT License
 └── README.md                      # This file
 ```
