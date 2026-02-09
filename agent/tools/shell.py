@@ -1,6 +1,7 @@
 """Shell execution tool"""
 import subprocess
 import os
+import platform
 from typing import Dict, Any, Tuple, Optional
 from dataclasses import dataclass
 
@@ -30,6 +31,14 @@ class ShellTool:
                 "dd if=/dev/zero",
                 ":(){:|:&};:",  # fork bomb
             ]
+
+            # Add Windows-specific dangerous patterns
+            if platform.system() == 'Windows':
+                dangerous_patterns.extend([
+                    "del /s /q C:\\",
+                    "format C:",
+                    "diskpart",
+                ])
 
             for pattern in dangerous_patterns:
                 if pattern in command:

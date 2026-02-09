@@ -39,6 +39,32 @@ class AIEngine:
         """Clear conversation history"""
         self.conversation_history = []
 
+    def truncate_web_results(self, max_length: int = 300) -> None:
+        """Truncate web search and read_url results in conversation history to reduce token usage"""
+        for msg in self.conversation_history:
+            # Check if message contains web_search or read_url results
+            if "执行 web_search:" in msg.content or "执行 read_url:" in msg.content:
+                # Truncate the content
+                if "执行 web_search:" in msg.content:
+                    prefix = "执行 web_search:"
+                else:
+                    prefix = "执行 read_url:"
+
+                # Find the position of the prefix
+                idx = msg.content.find(prefix)
+                if idx >= 0:
+                    # Keep the part before the prefix
+                    before = msg.content[:idx]
+                    # Get the part after the prefix
+                    after = msg.content[idx + len(prefix):]
+
+                    # Truncate the after part
+                    if len(after) > max_length:
+                        after = after[:max_length] + "... [内容已截断以节省上下文]"
+
+                    # Reconstruct the message
+                    msg.content = before + prefix + after
+
     def get_history(self) -> List[Dict[str, str]]:
         """Get conversation history in API format"""
         return [

@@ -386,7 +386,7 @@ class ExtendedToolExecutor:
                 "api_key": tavily_api_key,
                 "query": query,
                 "include_answer": True,
-                "max_results": 10
+                "max_results": 5
             }
 
             response = requests.post(search_url, json=payload, timeout=10)

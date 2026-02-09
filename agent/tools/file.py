@@ -20,9 +20,10 @@ class FileTool:
         # Expand ~ to home directory
         path = os.path.expanduser(path)
 
-        # If path doesn't start with /, make it absolute from home
-        if not path.startswith("/"):
-            path = os.path.expanduser("~") + "/" + path
+        # If path is not absolute, make it absolute from home
+        # Use os.path.isabs() for cross-platform compatibility
+        if not os.path.isabs(path):
+            path = os.path.join(os.path.expanduser("~"), path)
 
         return path
 

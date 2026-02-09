@@ -435,47 +435,65 @@ AI 想要执行以下操作：
 
                 # 获取用户输入
                 import sys
-                import tty
-                import termios
+                import platform
 
-                # 保存终端设置
-                fd = sys.stdin.fileno()
-                old_settings = termios.tcgetattr(fd)
-
-                try:
-                    tty.setraw(fd)
-                    ch = sys.stdin.read(1)
-
-                    if ch == '\x1b':  # ESC序列
-                        next1 = sys.stdin.read(1)
-                        if next1 == '[':
-                            next2 = sys.stdin.read(1)
-                            if next2 == 'C':  # 右箭头
-                                selected = (selected + 1) % len(options)
-                            elif next2 == 'D':  # 左箭头
-                                selected = (selected - 1) % len(options)
-                            elif next2 == 'A':  # 上箭头
-                                selected = (selected - 1) % len(options)
-                            elif next2 == 'B':  # 下箭头
-                                selected = (selected + 1) % len(options)
-                    elif ch == '\r' or ch == '\n':  # 回车
-                        print()  # 换行
-                        return options[selected]
-                    elif ch.lower() == 'y':  # 快捷键 y
-                        print()
+                # Windows 和 Unix 的不同处理方式
+                if platform.system() == 'Windows':
+                    # Windows 上使用简单的输入方式
+                    ch = input().strip()
+                    if ch.lower() == 'y':
                         return 'yes'
-                    elif ch.lower() == 'a':  # 快捷键 a
-                        print()
+                    elif ch.lower() == 'a':
                         return 'all'
-                    elif ch.lower() == 'n':  # 快捷键 n
-                        print()
+                    elif ch.lower() == 'n':
                         return 'no'
-                    elif ch == 'q' or ch == '\x03':  # q 或 Ctrl+C
-                        print()
+                    elif ch.lower() == 'q':
                         return 'no'
+                    else:
+                        return options[selected]
+                else:
+                    # Unix/Linux/macOS 上使用 termios 处理箭头键
+                    import tty
+                    import termios
 
-                finally:
-                    termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+                    # 保存终端设置
+                    fd = sys.stdin.fileno()
+                    old_settings = termios.tcgetattr(fd)
+
+                    try:
+                        tty.setraw(fd)
+                        ch = sys.stdin.read(1)
+
+                        if ch == '\x1b':  # ESC序列
+                            next1 = sys.stdin.read(1)
+                            if next1 == '[':
+                                next2 = sys.stdin.read(1)
+                                if next2 == 'C':  # 右箭头
+                                    selected = (selected + 1) % len(options)
+                                elif next2 == 'D':  # 左箭头
+                                    selected = (selected - 1) % len(options)
+                                elif next2 == 'A':  # 上箭头
+                                    selected = (selected - 1) % len(options)
+                                elif next2 == 'B':  # 下箭头
+                                    selected = (selected + 1) % len(options)
+                        elif ch == '\r' or ch == '\n':  # 回车
+                            print()  # 换行
+                            return options[selected]
+                        elif ch.lower() == 'y':  # 快捷键 y
+                            print()
+                            return 'yes'
+                        elif ch.lower() == 'a':  # 快捷键 a
+                            print()
+                            return 'all'
+                        elif ch.lower() == 'n':  # 快捷键 n
+                            print()
+                            return 'no'
+                        elif ch == 'q' or ch == '\x03':  # q 或 Ctrl+C
+                            print()
+                            return 'no'
+
+                    finally:
+                        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
             except KeyboardInterrupt:
                 print("\n⚠️  已取消\n")
@@ -528,7 +546,7 @@ AI 想要执行以下操作：
 
         context = "之前的执行过程:\n"
         # 保留完整的执行历史，不截断
-        for entry in self.execution_history[-10:]:  # Keep last 10 steps
+        for entry in self.execution_history:
             context += f"- {entry}\n"
 
         return context
@@ -541,18 +559,15 @@ AI 想要执行以下操作：
             if "执行 web_search:" in entry or "执行 read_url:" in entry:
                 # Extract tool name and result
                 if "执行 web_search:" in entry:
-                    tool_name = "web_search"
                     prefix = "执行 web_search:"
                 else:
-                    tool_name = "read_url"
                     prefix = "执行 read_url:"
 
                 result = entry[len(prefix):].strip()
 
-                # If result is very long (> 500 chars), truncate it
-                if len(result) > 500:
-                    # Keep only first 200 chars as summary
-                    summary = result[:200] + "... [内容已截断以节省上下文]"
+                # 截断到300字符
+                if len(result) > 300:
+                    summary = result[:300] + "... [内容已截断以节省上下文]"
                     cleaned_history.append(f"{prefix} {summary}")
                 else:
                     cleaned_history.append(entry)
@@ -791,6 +806,8 @@ async def gateway_mode():
                     continue
 
                 # Reset execution state for new message
+                executor._cleanup_large_results()  # 清理上一个任务的大型网页结果
+                executor.ai_engine.truncate_web_results(max_length=300)  # 截断AI引擎对话历史中的网页结果
                 executor.execution_history = []
                 executor.step_count = 0
                 executor.allow_all_commands = False
@@ -854,6 +871,10 @@ def main():
             if user_input.lower().strip() == "/clear":
                 executor._clear_history()
                 continue
+
+            # 清理上一个任务的大型网页结果
+            executor._cleanup_large_results()
+            executor.ai_engine.truncate_web_results(max_length=300)  # 截断AI引擎对话历史中的网页结果
 
             # Reset for new task
             executor.execution_history = []
