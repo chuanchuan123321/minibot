@@ -311,34 +311,48 @@ python chat.py gateway
 Minibot/
 ├── agent/
 │   ├── core/
-│   │   ├── ai_engine.py          # AI 引擎
-│   │   └── extended_tool_executor.py  # 工具执行器
+│   │   ├── ai_engine.py              # AI 引擎
+│   │   ├── extended_tool_executor.py # 工具执行器
+│   │   └── skills.py                 # Skills 加载器
 │   ├── tools/
-│   │   ├── shell.py              # Shell 工具
-│   │   ├── file.py               # 文件工具
-│   │   ├── time_tool.py          # 时间工具
-│   │   └── pdf_tool.py           # PDF 生成工具
+│   │   ├── shell.py                  # Shell 命令工具
+│   │   ├── file.py                   # 文件操作工具
+│   │   ├── time_tool.py              # 定时器工具
+│   │   ├── pdf_tool.py               # PDF 生成工具
+│   │   └── skill_tool.py             # Skill 加载工具
 │   ├── channels/
-│   │   ├── base.py               # 通道基类
-│   │   ├── feishu.py             # 飞书集成
-│   │   └── manager.py            # 通道管理器
+│   │   ├── base.py                   # 通道基类
+│   │   ├── feishu.py                 # 飞书集成
+│   │   └── manager.py                # 通道管理器
 │   ├── bus/
-│   │   ├── queue.py              # 消息队列
-│   │   └── events.py             # 事件定义
+│   │   ├── queue.py                  # 消息队列
+│   │   └── events.py                 # 事件定义
 │   ├── config/
-│   │   ├── loader.py             # 配置加载器
-│   │   └── schema.py             # 配置模式
+│   │   ├── loader.py                 # 配置加载器
+│   │   └── schema.py                 # 配置模式
+│   ├── skills/                       # 内置 Skills
+│   │   ├── github/
+│   │   ├── web/
+│   │   ├── python/
+│   │   ├── project-setup/
+│   │   └── skill-creator/
 │   └── ui/
-│       └── cli.py                # CLI 界面
-├── images/                        # 演示截图文件夹
-│   └── demo.png                  # 运行界面截图
-├── chat.py                        # 主程序
-├── setup.py                       # 安装配置
-├── requirements.txt               # 依赖列表
-├── .env.example                   # 环境变量示例
-├── .gitignore                     # Git 忽略文件
-├── LICENSE                        # 许可证
-└── README.md                      # 本文件
+│       └── cli.py                    # CLI 界面
+├── workspace/
+│   ├── output/                       # 最终输出文件（保留）
+│   ├── temp/                         # 临时文件（自动清理）
+│   ├── cache/                        # 缓存数据
+│   └── skills/                       # 自定义用户 Skills
+├── images/                           # 演示截图文件夹
+│   └── demo.png                      # 运行界面截图
+├── chat.py                           # 主程序
+├── setup.py                          # 安装配置
+├── requirements.txt                  # 依赖列表
+├── .env.example                      # 环境变量示例
+├── .gitignore                        # Git 忽略文件
+├── CLAUDE.md                         # Claude Code 指导
+├── LICENSE                           # 许可证
+└── README.md                         # 本文件
 ```
 
 ## 常见问题

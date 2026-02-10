@@ -317,34 +317,48 @@ Next I will: Create test file
 Minibot/
 ├── agent/
 │   ├── core/
-│   │   ├── ai_engine.py          # AI Engine
-│   │   └── extended_tool_executor.py  # Tool Executor
+│   │   ├── ai_engine.py              # AI Engine
+│   │   ├── extended_tool_executor.py # Tool Executor
+│   │   └── skills.py                 # Skills Loader
 │   ├── tools/
-│   │   ├── shell.py              # Shell Tool
-│   │   ├── file.py               # File Tool
-│   │   ├── time_tool.py          # Time Tool
-│   │   └── pdf_tool.py           # PDF Generation Tool
+│   │   ├── shell.py                  # Shell Command Tool
+│   │   ├── file.py                   # File Operations Tool
+│   │   ├── time_tool.py              # Timer Tool
+│   │   ├── pdf_tool.py               # PDF Generation Tool
+│   │   └── skill_tool.py             # Skill Loading Tool
 │   ├── channels/
-│   │   ├── base.py               # Base Channel
-│   │   ├── feishu.py             # Feishu Integration
-│   │   └── manager.py            # Channel Manager
+│   │   ├── base.py                   # Base Channel Class
+│   │   ├── feishu.py                 # Feishu Integration
+│   │   └── manager.py                # Channel Manager
 │   ├── bus/
-│   │   ├── queue.py              # Message Queue
-│   │   └── events.py             # Event Definitions
+│   │   ├── queue.py                  # Message Queue
+│   │   └── events.py                 # Event Definitions
 │   ├── config/
-│   │   ├── loader.py             # Config Loader
-│   │   └── schema.py             # Config Schema
+│   │   ├── loader.py                 # Config Loader
+│   │   └── schema.py                 # Config Schema
+│   ├── skills/                       # Built-in Skills
+│   │   ├── github/
+│   │   ├── web/
+│   │   ├── python/
+│   │   ├── project-setup/
+│   │   └── skill-creator/
 │   └── ui/
-│       └── cli.py                # CLI Interface
-├── images/                        # Demo screenshots folder
-│   └── demo.png                  # Interface screenshot
-├── chat.py                        # Main program
-├── setup.py                       # Installation configuration
-├── requirements.txt               # Dependencies list
-├── .env.example                   # Environment variables example
-├── .gitignore                     # Git ignore file
-├── LICENSE                        # MIT License
-└── README.md                      # This file
+│       └── cli.py                    # CLI Interface
+├── workspace/
+│   ├── output/                       # Final output files (preserved)
+│   ├── temp/                         # Temporary files (auto-cleaned)
+│   ├── cache/                        # Cache data
+│   └── skills/                       # Custom user skills
+├── images/                           # Demo screenshots
+│   └── demo.png                      # Interface screenshot
+├── chat.py                           # Main program
+├── setup.py                          # Installation configuration
+├── requirements.txt                  # Dependencies list
+├── .env.example                      # Environment variables example
+├── .gitignore                        # Git ignore file
+├── CLAUDE.md                         # Claude Code guidance
+├── LICENSE                           # MIT License
+└── README.md                         # This file
 ```
 
 ## FAQ
