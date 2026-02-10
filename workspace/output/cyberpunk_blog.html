@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEO-CITY | 赛博空间博客</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-green: #00ff00;
+            --neon-pink: #ff00ff;
+            --neon-cyan: #00ffff;
+            --bg-dark: #0a0a0c;
+            --card-bg: rgba(20, 20, 25, 0.8);
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: #e0e0e0;
+            font-family: 'Fira Code', monospace;
+            overflow-x: hidden;
+            margin: 0;
+        }
+
+        /* 扫描线效果 */
+        body::before {
+            content: " ";
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 100;
+            background-size: 100% 4px, 3px 100%;
+            pointer-events: none;
+        }
+
+        /* 霓虹发光文字 */
+        .neon-text-green {
+            text-shadow: 0 0 5px var(--neon-green), 0 0 10px var(--neon-green);
+            color: var(--neon-green);
+        }
+
+        .neon-text-pink {
+            text-shadow: 0 0 5px var(--neon-pink), 0 0 10px var(--neon-pink);
+            color: var(--neon-pink);
+        }
+
+        .neon-border-cyan {
+            border: 1px solid var(--neon-cyan);
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3), inset 0 0 10px rgba(0, 255, 255, 0.2);
+        }
+
+        /* 故障效果动画 */
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+
+        .glitch-hover:hover {
+            animation: glitch 0.3s cubic-bezier(.25, .46, .45, .94) both infinite;
+        }
+
+        /* 背景城市装饰 */
+        .city-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, transparent, var(--bg-dark)),
+                        url('https://images.unsplash.com/photo-1515879218367-8466d910aaa4?auto=format&fit=crop&w=1920&q=80');
+            background-size: cover;
+            background-position: center;
+            opacity: 0.15;
+            z-index: -1;
+        }
+
+        /* 磨砂玻璃卡片 */
+        .cyber-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border-left: 4px solid var(--neon-pink);
+            transition: all 0.3s ease;
+        }
+
+        .cyber-card:hover {
+            transform: translateY(-5px) scale(1.01);
+            box-shadow: -5px 0 20px var(--neon-pink);
+            background: rgba(30, 30, 35, 0.9);
+        }
+
+        .nav-link {
+            position: relative;
+            transition: color 0.3s;
+        }
+
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 2px;
+            bottom: -4px;
+            left: 0;
+            background-color: var(--neon-cyan);
+            transition: width 0.3s;
+        }
+
+        .nav-link:hover::after {
+            width: 100%;
+        }
+
+        .terminal-header::before {
+            content: "> ";
+            color: var(--neon-green);
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--neon-pink);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="city-bg"></div>
+
+    <!-- 导航栏 -->
+    <nav class="max-w-7xl mx-auto flex justify-between items-center mb-16 relative z-10">
+        <div class="text-2xl font-bold neon-text-pink glitch-hover cursor-pointer">
+            NEO_LOG v2.0
+        </div>
+        <div class="hidden md:flex space-x-8 text-sm">
+            <a href="#" class="nav-link text-cyan-400">// 主页</a>
+            <a href="#" class="nav-link">// 档案</a>
+            <a href="#" class="nav-link">// 实验室</a>
+            <a href="#" class="nav-link">// 联络</a>
+        </div>
+        <div class="neon-border-cyan px-4 py-1 text-xs cursor-pointer hover:bg-cyan-500/20 transition-colors">
+            STATUS: ONLINE
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="max-w-7xl mx-auto mb-20 relative z-10">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div>
+                <h1 class="text-5xl md:text-7xl font-bold mb-6 leading-tight">
+                    欢迎来到 <br>
+                    <span class="neon-text-green">赛博边缘</span>
+                </h1>
+                <p class="text-gray-400 text-lg mb-8 max-w-lg">
+                    在这里，代码即法律，数据即灵魂。我记录在数字荒原中的每一次探索与代码片段。
+                </p>
+                <div class="flex space-x-4">
+                    <button class="bg-pink-600 hover:bg-pink-500 text-white px-8 py-3 font-bold transition-all transform hover:skew-x-12">
+                        连接神经接口
+                    </button>
+                    <button class="border border-green-500 text-green-500 px-8 py-3 font-bold hover:bg-green-500/10 transition-all">
+                        查看源代码
+                    </button>
+                </div>
+            </div>
+            <div class="relative">
+                <div class="absolute -top-4 -left-4 w-24 h-24 border-t-2 border-l-2 border-pink-500"></div>
+                <div class="absolute -bottom-4 -right-4 w-24 h-24 border-b-2 border-r-2 border-cyan-500"></div>
+                <img src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=800&q=80" 
+                     alt="Cyber Deck" 
+                     class="w-full grayscale hover:grayscale-0 transition-all duration-500 shadow-2xl">
+            </div>
+        </div>
+    </header>
+
+    <!-- Bento Grid Posts -->
+    <main class="max-w-7xl mx-auto relative z-10">
+        <h2 class="text-2xl mb-10 terminal-header neon-text-cyan">最新数据同步</h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- 大卡片 -->
+            <div class="md:col-span-2 cyber-card p-8 flex flex-col justify-between min-h-[400px]">
+                <div>
+                    <div class="text-xs text-pink-500 mb-2"># 架构设计</div>
+                    <h3 class="text-3xl font-bold mb-4">构建去中心化的未来：从 Web2 到 Web3 的跨越</h3>
+                    <p class="text-gray-400">深入探讨区块链技术如何重塑我们对数字资产和身份的认知，以及在黑暗网络中寻找光明的可能...</p>
+                </div>
+                <div class="mt-8 flex justify-between items-center">
+                    <span class="text-xs text-gray-500 font-mono">TIMESTAMP: 2026.02.10</span>
+                    <a href="#" class="text-green-500 hover:underline">阅读全文 _</a>
+                </div>
+            </div>
+
+            <!-- 小卡片 1 -->
+            <div class="cyber-card p-6 border-l-cyan-500" style="border-left-color: var(--neon-cyan);">
+                <div class="text-xs text-cyan-500 mb-2"># 硬件</div>
+                <h3 class="text-xl font-bold mb-4">机械键盘的触感艺术</h3>
+                <p class="text-gray-400 text-sm mb-4">为什么每一位黑客都需要一把趁手的“武器”？</p>
+                <span class="text-xs text-gray-500 font-mono">2026.01.28</span>
+            </div>
+
+            <!-- 小卡片 2 -->
+            <div class="cyber-card p-6">
+                <div class="text-xs text-pink-500 mb-2"># 视觉</div>
+                <h3 class="text-xl font-bold mb-4">霓虹美学：色彩心理学</h3>
+                <p class="text-gray-400 text-sm mb-4">如何在暗色调中利用高饱和度色彩抓住用户的眼球。</p>
+                <span class="text-xs text-gray-500 font-mono">2026.01.15</span>
+            </div>
+
+            <!-- 小卡片 3 -->
+            <div class="cyber-card p-6 border-l-green-500" style="border-left-color: var(--neon-green);">
+                <div class="text-xs text-green-500 mb-2"># 代码</div>
+                <h3 class="text-xl font-bold mb-4">Rust 内存安全的秘密</h3>
+                <p class="text-gray-400 text-sm mb-4">告别段错误，拥抱高性能系统的未来。</p>
+                <span class="text-xs text-gray-500 font-mono">2025.12.20</span>
+            </div>
+
+            <!-- 装饰性卡片 -->
+            <div class="cyber-card p-6 bg-gradient-to-br from-pink-900/40 to-cyan-900/40 border-none">
+                <div class="h-full flex flex-col justify-center items-center text-center">
+                    <div class="text-4xl mb-4">⚡</div>
+                    <div class="text-lg font-bold">加入系统</div>
+                    <p class="text-xs text-gray-400 mt-2">输入你的邮件地址以接收加密简报</p>
+                    <input type="text" class="mt-4 bg-black/50 border border-gray-700 p-2 text-xs w-full focus:outline-none focus:border-pink-500" placeholder="USER@DOMAIN.COM">
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="max-w-7xl mx-auto mt-20 py-10 border-t border-gray-800 text-center relative z-10">
+        <div class="text-xs text-gray-500 font-mono">
+            &copy; 2026 NEO-CITY BLOG SYSTEM. ALL RIGHTS RESERVED. <br>
+            <span class="neon-text-green">ENCRYPTED CONNECTION ESTABLISHED</span>
+        </div>
+    </footer>
+</body>
+</html>

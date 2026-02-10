@@ -11,12 +11,14 @@ locale.setlocale(locale.LC_ALL, '')
 
 from agent.core.ai_engine import AIEngine
 from agent.core.extended_tool_executor import ExtendedToolExecutor
+from agent.core.skills import SkillsLoader
 from agent.bus.queue import MessageBus
 from agent.bus.events import OutboundMessage
 from agent.channels.manager import ChannelManager
 from agent.config.loader import load_config
 import json
 import asyncio
+from pathlib import Path
 
 
 class NaturalTaskExecutor:
@@ -24,8 +26,16 @@ class NaturalTaskExecutor:
 
     def __init__(self, bus: MessageBus | None = None):
         self.ai_engine = AIEngine()
-        self.tool_executor = ExtendedToolExecutor()
+
+        # Initialize skills loader
+        workspace_path = Path(__file__).parent / "workspace"
+        workspace_path.mkdir(exist_ok=True)
+        self.skills_loader = SkillsLoader(workspace_path)
+
+        # Initialize tool executor with skills loader
+        self.tool_executor = ExtendedToolExecutor(skills_loader=self.skills_loader)
         self.available_tools = self.tool_executor.get_available_tools()
+
         self.execution_history = []
         self.step_count = 0
         self.max_steps = 100
@@ -43,6 +53,8 @@ class NaturalTaskExecutor:
         self.pending_user_request = None  # 待执行的用户请求
         self.pending_context = None  # 待执行的上下文
         self.should_stop = False  # 是否应该停止当前任务
+        self.web_search_count = 0  # 网络搜索计数
+        self.max_web_searches = 5  # 最多搜索 5 次
 
     def execute_task(self, user_request: str):
         """Execute task dynamically with natural flow"""
@@ -50,6 +62,9 @@ class NaturalTaskExecutor:
         if user_request.lower().strip() == "/clear":
             self._clear_history()
             return
+
+        # 重置搜索计数（每个新任务开始时）
+        self.web_search_count = 0
 
         # Build context from execution history
         context = self._build_context()
@@ -74,10 +89,47 @@ class NaturalTaskExecutor:
         from agent.tools.time_tool import TimeTool
         current_time = TimeTool.get_current_time()
 
+        # Build skills context (two-layer strategy like nanobot)
+        # 1. Get all skills summary
+        skills_summary = self.skills_loader.build_skills_summary()
+
+        # 2. AI 根据需要主动调用 load_skill 来加载 skills
+
+        # 3. Get project paths
+        project_root = Path(__file__).parent
+        workspace_path = project_root / "workspace"
+        builtin_skills_path = project_root / "agent" / "skills"
+        workspace_skills_path = workspace_path / "skills"
+        output_path = workspace_path / "output"
+        temp_path = workspace_path / "temp"
+        cache_path = workspace_path / "cache"
+        desktop_path = Path.home() / "Desktop"
+
         # Build the prompt for this step
-        step_prompt = f"""【系统信息】
+        step_prompt = f"""你是 Minibot，一个轻量级的 AI 自动化工具，可以执行各种任务。
+
+【系统信息】
 当前时间: {current_time}
 步骤: {self.step_count}/{self.max_steps}
+网络搜索次数: {self.web_search_count}/{self.max_web_searches}
+
+【项目路径】
+项目根目录: {project_root}
+工作区目录: {workspace_path}
+内置 Skills: {builtin_skills_path}
+工作区 Skills: {workspace_skills_path}
+桌面路径: {desktop_path}
+
+【文件管理规范】
+输出文件目录: {output_path}
+临时文件目录: {temp_path}
+缓存文件目录: {cache_path}
+
+⚠️ 文件创建规则:
+- 最终输出文件 → {output_path}
+- 中间临时文件 → {temp_path}
+- 缓存数据 → {cache_path}
+- 不要在项目根目录或其他地方创建文件，除非用户明确指定
 
 任务: {user_request}
 
@@ -104,6 +156,11 @@ class NaturalTaskExecutor:
 - set_timer: 设置定时器（在指定分钟后触发）
 - send_file: 发送文件到飞书（仅在网关模式下可用）
 - generate_pdf: 将 Markdown/文本/HTML/Word 文档转换为 PDF
+- load_skill: 加载 skill 的完整内容（当需要详细指导时调用）
+
+## 可用的 Skills
+
+{skills_summary}
 
 重要提示:
 - 如果任务涉及阅读文档（.pdf, .docx, .doc等），优先使用 read_pdf 工具
@@ -113,6 +170,57 @@ class NaturalTaskExecutor:
 - 只有当任务真正完成时才给出最终回应
 - 如果找到了任务所需的信息，使用它来进行下一步
 - 如果需要发送文件给用户，使用 send_file 工具（仅在网关模式下可用）
+
+## 如何使用 Skills
+
+查看上面的"可用的 Skills"列表，如果有相关 skill 可以帮助完成任务：
+
+1. **查看 skill 摘要**：从 XML 格式的 skills 列表中了解有哪些 skills 可用
+2. **主动加载 skill**：如果需要某个 skill 的详细内容和指导，使用 load_skill 工具
+3. **参考 skill 指导**：根据加载的 skill 内容中的最佳实践和示例来完成任务
+4. **读取 skill 文件**：可以使用 file_read 工具来读取 skill 目录中的任何文件（如 template.md、examples 等）
+
+### 使用 load_skill 的示例
+
+**例子1：需要 Web 搜索指导时**
+```
+接下来我要: 加载 web skill 来获取搜索技巧
+
+===== JSON START =====
+{{"action": "execute_tool", "tool": "load_skill", "params": {{"skill_name": "web"}}}}
+===== JSON END =====
+```
+
+**例子2：需要 GitHub 操作指导时**
+```
+接下来我要: 加载 github skill 来了解如何使用 gh 命令
+
+===== JSON START =====
+{{"action": "execute_tool", "tool": "load_skill", "params": {{"skill_name": "github"}}}}
+===== JSON END =====
+```
+
+**例子3：需要 Python 最佳实践时**
+```
+接下来我要: 加载 python skill 来参考编程最佳实践
+
+===== JSON START =====
+{{"action": "execute_tool", "tool": "load_skill", "params": {{"skill_name": "python"}}}}
+===== JSON END =====
+```
+
+⚠️ 防止重复搜索和无限循环:
+- 检查执行历史，不要重复执行相同的 web_search 或 read_url 操作
+- 如果已经搜索过某个关键词，不要再搜索相同内容
+- 网络搜索总次数不能超过 5 次，超过后必须基于已有信息给出结论
+- 如果发现自己在重复相同操作，立即改变策略或给出最终回应
+- 优先使用已获取的信息，而不是继续搜索
+
+⚠️ 临时文件清理规则:
+- 所有中间处理文件必须放在 {temp_path}
+- 任务完成时，系统会自动清理 {temp_path} 中的所有文件
+- 如果需要保留文件，必须移动到 {output_path}
+- 不要在项目根目录或其他地方创建临时文件
 
 你需要用自然语言描述接下来要做什么，然后给出JSON对象。
 
@@ -167,11 +275,15 @@ class NaturalTaskExecutor:
 
         # Handle different actions
         if action == "execute_tool":
-            # 如果不是允许所有命令，则询问用户
-            if not self.allow_all_commands:
+            tool_name = decision.get("tool", "unknown")
+
+            # 检查工具是否需要确认
+            requires_approval = self._is_tool_requires_approval(tool_name)
+
+            # 如果不是允许所有命令，且工具需要确认，则询问用户
+            if not self.allow_all_commands and requires_approval:
                 if self.is_gateway_mode:
                     # 网关模式：发送确认请求到飞书，并等待用户回复
-                    tool_name = decision.get("tool", "unknown")
                     params = decision.get("params", {})
                     action_desc = self._get_action_description(tool_name, params)
 
@@ -232,6 +344,9 @@ AI 想要执行以下操作：
 
             # 清理大型搜索结果以节省上下文
             self._cleanup_large_results()
+
+            # 自动清理临时文件
+            self._cleanup_temp_files()
 
             # 如果在网关模式下，发送回复到消息总线
             if self.bus and self.current_channel and self.current_chat_id:
@@ -374,6 +489,15 @@ AI 想要执行以下操作：
         tool_name = decision.get("tool")
         params = decision.get("params", {})
 
+        # 如果是网络搜索，检查是否超过限制
+        if tool_name == "web_search":
+            if self.web_search_count >= self.max_web_searches:
+                result = f"⚠️ 已达到网络搜索限制({self.max_web_searches}次)，请基于已有信息给出结论"
+                print(f"\n执行结果:\n{result}\n")
+                self.execution_history.append(f"执行 {tool_name}: {result}")
+                return
+            self.web_search_count += 1
+
         # 如果是设置定时器，传入执行器引用
         if tool_name == "set_timer":
             params["executor"] = self
@@ -502,6 +626,24 @@ AI 想要执行以下操作：
                 print(f"\n错误: {e}")
                 return "no"
 
+    def _is_tool_requires_approval(self, tool_name: str) -> bool:
+        """Check if a tool requires user approval before execution"""
+        # 只读和安全操作不需要确认
+        safe_tools = {
+            "load_skill",      # 加载skill内容
+            "read_pdf",        # 读取PDF
+            "read_markdown",   # 读取Markdown
+            "read_json",       # 读取JSON
+            "file_read",       # 读取文件
+            "file_list",       # 列出文件
+            "search_files",    # 搜索文件
+            "get_file_info",   # 获取文件信息
+            "web_search",      # 网络搜索
+            "read_url",        # 读取URL
+            "set_timer",       # 设置定时器
+        }
+        return tool_name not in safe_tools
+
     def _get_action_description(self, tool_name: str, params: dict) -> str:
         """Get natural description of the action"""
         descriptions = {
@@ -521,6 +663,7 @@ AI 想要执行以下操作：
             "move_file": f"移动文件 {params.get('source')} 到 {params.get('destination')}",
             "create_file": f"创建文件 {params.get('path')}",
             "send_file": f"发送文件到飞书 {params.get('path')}",
+            "load_skill": f"加载 skill: {params.get('skill_name')}",
         }
         return descriptions.get(tool_name, f"执行 {tool_name}")
 
@@ -576,6 +719,34 @@ AI 想要执行以下操作：
 
         self.execution_history = cleaned_history
 
+    def _cleanup_temp_files(self) -> None:
+        """Automatically clean up temporary files after task completion"""
+        import shutil
+
+        workspace_path = Path(__file__).parent / "workspace"
+        temp_path = workspace_path / "temp"
+
+        try:
+            if temp_path.exists():
+                # 列出要删除的文件
+                files_to_delete = list(temp_path.glob("*"))
+
+                if files_to_delete:
+                    print(f"\n🧹 清理临时文件...")
+                    for file in files_to_delete:
+                        try:
+                            if file.is_dir():
+                                shutil.rmtree(file)
+                                print(f"  ✓ 删除目录: {file.name}")
+                            else:
+                                file.unlink()
+                                print(f"  ✓ 删除文件: {file.name}")
+                        except Exception as e:
+                            print(f"  ⚠️  无法删除 {file.name}: {e}")
+                    print(f"✅ 临时文件清理完成\n")
+        except Exception as e:
+            print(f"⚠️  清理临时文件出错: {e}\n")
+
     def _clear_history(self) -> None:
         """Clear conversation history and execution history"""
         # Clear AI engine history
@@ -586,6 +757,9 @@ AI 想要执行以下操作：
 
         # Reset step counter
         self.step_count = 0
+
+        # Reset web search counter
+        self.web_search_count = 0
 
         # Reset command approval state
         self.allow_all_commands = False
@@ -810,6 +984,7 @@ async def gateway_mode():
                 executor.ai_engine.truncate_web_results(max_length=300)  # 截断AI引擎对话历史中的网页结果
                 executor.execution_history = []
                 executor.step_count = 0
+                executor.web_search_count = 0  # 重置搜索计数
                 executor.allow_all_commands = False
                 executor.should_stop = False
 
@@ -879,6 +1054,7 @@ def main():
             # Reset for new task
             executor.execution_history = []
             executor.step_count = 0
+            executor.web_search_count = 0  # 重置搜索计数
             executor.allow_all_commands = False  # 重置命令允许状态
 
             print()

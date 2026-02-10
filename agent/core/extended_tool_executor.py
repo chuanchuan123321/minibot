@@ -5,6 +5,7 @@ from agent.tools.shell import ShellTool
 from agent.tools.file import FileTool
 from agent.tools.time_tool import TimeTool
 from agent.tools.pdf_tool import PDFTool
+from agent.tools.skill_tool import SkillTool
 import os
 import requests
 
@@ -12,10 +13,11 @@ import requests
 class ExtendedToolExecutor:
     """Execute tools with extended capabilities including document reading"""
 
-    def __init__(self):
+    def __init__(self, skills_loader=None):
         self.shell_tool = ShellTool()
         self.file_tool = FileTool()
         self.pdf_tool = PDFTool()
+        self.skill_tool = SkillTool(skills_loader) if skills_loader else None
         self.tools: Dict[str, Callable] = {
             "shell": self.execute_shell,
             "file_read": self.execute_file_read,
@@ -37,6 +39,7 @@ class ExtendedToolExecutor:
             "set_timer": self.execute_set_timer,
             "send_file": self.execute_send_file,
             "generate_pdf": self.execute_generate_pdf,
+            "load_skill": self.execute_load_skill,
         }
 
     def get_available_tools(self) -> list:
@@ -141,6 +144,11 @@ class ExtendedToolExecutor:
                 "name": "generate_pdf",
                 "description": "Generate PDF from Markdown, text, HTML, or Word documents",
                 "params": "input_path (string): Input file path, output_path (string): Output PDF file path, format (string): Input format (markdown/text/html/docx)"
+            },
+            {
+                "name": "load_skill",
+                "description": "Load a skill's complete content to get detailed guidance and instructions",
+                "params": "skill_name (string): Name of the skill to load (e.g., 'web', 'github', 'python')"
             },
         ]
 
@@ -633,3 +641,16 @@ class ExtendedToolExecutor:
             return f"✅ {message}"
         else:
             return message
+
+    def execute_load_skill(self, params: Dict[str, Any]) -> str:
+        """Load a skill's complete content"""
+        if not self.skill_tool:
+            return "Error: Skill tool not initialized"
+
+        skill_name = params.get("skill_name", "").strip()
+        if not skill_name:
+            return "Error: skill_name parameter required"
+
+        success, content = self.skill_tool.load_skill(skill_name)
+        return content
+
