@@ -120,11 +120,6 @@ class NaturalTaskExecutor:
 工作区 Skills: {workspace_skills_path}
 桌面路径: {desktop_path}
 
-【文件管理规范】
-输出文件目录: {output_path}
-临时文件目录: {temp_path}
-缓存文件目录: {cache_path}
-
 ⚠️ 文件创建规则:
 - 最终输出文件 → {output_path}
 - 中间临时文件 → {temp_path}
