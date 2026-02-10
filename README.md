@@ -33,6 +33,8 @@ An ultra-lightweight AI automation tool that can execute various tasks in the te
 - ✅ Command Approval - Interactive command confirmation
 - 📤 **File Sending** - Send files to Feishu (Gateway Mode)
 - 💬 **Feishu Integration** - Real-time task progress updates via Feishu
+- 🎓 **Skill System** - Modular knowledge base with 6+ built-in skills
+- 🔄 **Smart Tool Loading** - AI consciously loads skills and tools as needed
 
 ## Installation
 
