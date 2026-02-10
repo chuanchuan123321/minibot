@@ -355,6 +355,70 @@ Minibot/
 └── README.md                         # 本文件
 ```
 
+## Skill 系统
+
+Minibot 包含强大的 Skill 系统，用于模块化知识管理：
+
+### 什么是 Skill？
+
+Skill 是可重用的知识模块，教导 AI 关于特定领域、工具或最佳实践。每个 Skill 包含：
+- **SKILL.md** - 详细的指导和示例
+- **scripts/** - Python/Shell 脚本用于自动化
+- **data/** - CSV 数据库用于搜索和推荐
+
+### 内置 Skill
+
+- **web** - 网页搜索技巧和最佳实践
+- **github** - GitHub CLI 使用指南
+- **python** - Python 编程最佳实践
+- **pdf** - PDF 处理和操作
+- **docx** - Word 文档创建和编辑
+- **ui-ux-pro-max** - UI/UX 设计智能，包含 50+ 样式和 97 个调色板
+
+### 使用 Skill
+
+1. **查看可用 Skill** - AI 在系统信息中看到所有 Skill
+2. **加载 Skill** - AI 调用 `load_skill("skill-name")` 获取详细指导
+3. **获得建议** - AI 使用 Skill 数据进行智能推荐
+
+### 创建自定义 Skill
+
+在 `workspace/skills/` 中创建新 Skill：
+
+```bash
+mkdir -p workspace/skills/my-skill
+cat > workspace/skills/my-skill/SKILL.md << 'EOF'
+---
+name: my-skill
+description: "我的自定义 Skill 描述"
+requires_bins: python
+requires_env:
+---
+
+# 我的 Skill
+
+详细内容和说明...
+EOF
+```
+
+### 文件管理
+
+Minibot 自动在有组织的目录中管理文件：
+
+```
+workspace/
+├── output/     # 最终输出文件（保留）
+├── temp/       # 临时文件（自动清理）
+├── cache/      # 缓存数据（可选清理）
+└── skills/     # Skill 模块
+```
+
+**规则：**
+- 最终输出 → `workspace/output/`
+- 临时文件 → `workspace/temp/`（任务完成后自动清理）
+- 缓存数据 → `workspace/cache/`
+- 系统信息包含所有路径供 AI 参考
+
 ## 常见问题
 
 ### Q: 如何获取 API 密钥？

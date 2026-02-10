@@ -361,6 +361,70 @@ Minibot/
 └── README.md                         # This file
 ```
 
+## Skill System
+
+Minibot includes a powerful skill system for modular knowledge management:
+
+### What are Skills?
+
+Skills are reusable knowledge modules that teach AI about specific domains, tools, or best practices. Each skill contains:
+- **SKILL.md** - Comprehensive guide with instructions and examples
+- **scripts/** - Python/shell scripts for automation
+- **data/** - CSV databases for searching and recommendations
+
+### Built-in Skills
+
+- **web** - Web search techniques and best practices
+- **github** - GitHub CLI usage guide
+- **python** - Python programming best practices
+- **pdf** - PDF processing and manipulation
+- **docx** - Word document creation and editing
+- **ui-ux-pro-max** - UI/UX design intelligence with 50+ styles and 97 color palettes
+
+### Using Skills
+
+1. **View Available Skills** - AI sees all skills in the system information
+2. **Load Skill** - AI calls `load_skill("skill-name")` to get detailed guidance
+3. **Get Recommendations** - AI uses skill data for intelligent suggestions
+
+### Creating Custom Skills
+
+Create a new skill in `workspace/skills/`:
+
+```bash
+mkdir -p workspace/skills/my-skill
+cat > workspace/skills/my-skill/SKILL.md << 'EOF'
+---
+name: my-skill
+description: "My custom skill description"
+requires_bins: python
+requires_env:
+---
+
+# My Skill
+
+Detailed content and instructions...
+EOF
+```
+
+### File Management
+
+Minibot automatically manages files in organized directories:
+
+```
+workspace/
+├── output/     # Final output files (preserved)
+├── temp/       # Temporary files (auto-cleaned)
+├── cache/      # Cache data (optional cleanup)
+└── skills/     # Skill modules
+```
+
+**Rules:**
+- Final output → `workspace/output/`
+- Temporary files → `workspace/temp/` (auto-cleaned after task)
+- Cache data → `workspace/cache/`
+- System info includes all paths for AI guidance
+
 ## FAQ
 
 ### Q: How do I get an API key?
