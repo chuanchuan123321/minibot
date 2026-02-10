@@ -274,13 +274,21 @@ python chat.py gateway
 | `file_list` | 列出目录文件 | `path` |
 | `file_delete` | 删除文件 | `path` |
 | `dir_create` | 创建目录 | `path` |
+| `dir_change` | 切换工作目录 | `path` |
 | `read_pdf` | 读取 PDF/Word 文档 | `path` |
 | `read_markdown` | 读取 Markdown 文件 | `path` |
 | `read_json` | 读取 JSON 文件 | `path` |
+| `search_files` | 按模式搜索文件 | `pattern`, `path` |
+| `get_file_info` | 获取文件信息 | `path` |
+| `copy_file` | 复制文件 | `source`, `destination` |
+| `move_file` | 移动/重命名文件 | `source`, `destination` |
+| `create_file` | 创建新文件 | `path`, `content` |
 | `web_search` | 搜索网页 | `query` |
 | `read_url` | 读取 URL 内容 | `url` |
 | `set_timer` | 设置定时器 | `minutes`, `message` |
 | `send_file` | 发送文件到飞书 | `path`（仅网关模式） |
+| `generate_pdf` | 从文档生成 PDF | `input_path`, `output_path`, `format` |
+| `load_skill` | 加载 Skill 的完整内容 | `skill_name` |
 
 ## 配置说明
 

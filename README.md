@@ -280,13 +280,21 @@ Next I will: Create test file
 | `file_list` | List directory files | `path` |
 | `file_delete` | Delete files | `path` |
 | `dir_create` | Create directories | `path` |
+| `dir_change` | Change working directory | `path` |
 | `read_pdf` | Read PDF/Word documents | `path` |
 | `read_markdown` | Read Markdown files | `path` |
 | `read_json` | Read JSON files | `path` |
+| `search_files` | Search for files by pattern | `pattern`, `path` |
+| `get_file_info` | Get file information | `path` |
+| `copy_file` | Copy files | `source`, `destination` |
+| `move_file` | Move/rename files | `source`, `destination` |
+| `create_file` | Create new files | `path`, `content` |
 | `web_search` | Search the web | `query` |
 | `read_url` | Read URL content | `url` |
 | `set_timer` | Set timer | `minutes`, `message` |
 | `send_file` | Send file to Feishu | `path` (Gateway Mode only) |
+| `generate_pdf` | Generate PDF from documents | `input_path`, `output_path`, `format` |
+| `load_skill` | Load skill's complete content | `skill_name` |
 
 ## Configuration
 
