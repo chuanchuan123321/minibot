@@ -202,9 +202,9 @@ class ExtendedToolExecutor:
         success, files = self.file_tool.list_files(path)
 
         if success:
-            file_list = "\n".join(files[:50])
-            if len(files) > 50:
-                file_list += f"\n... and {len(files) - 50} more files"
+            if not files:
+                return f"Files in {path}:\nnone"
+            file_list = "\n".join(files)
             return f"Files in {path}:\n{file_list}"
         return f"Error: {files[0] if files else 'Unknown error'}"
 
@@ -292,7 +292,7 @@ class ExtendedToolExecutor:
 
         success, content = self.file_tool.read_file(path)
         if success:
-            return f"Markdown contents:\n{content[:2000]}"
+            return f"Markdown contents:\n{content}"
         return f"Error: {content}"
 
     def execute_read_json(self, params: Dict[str, Any]) -> str:
@@ -305,7 +305,7 @@ class ExtendedToolExecutor:
             success, content = self.file_tool.read_file(path)
             if success:
                 data = json.loads(content)
-                return f"JSON contents:\n{json.dumps(data, indent=2, ensure_ascii=False)[:2000]}"
+                return f"JSON contents:\n{json.dumps(data, indent=2, ensure_ascii=False)}"
             return f"Error: {content}"
         except json.JSONDecodeError as e:
             return f"Error: Invalid JSON format - {str(e)}"
@@ -411,11 +411,11 @@ class ExtendedToolExecutor:
             # Add search results
             if data.get("results"):
                 results.append("搜索结果:")
-                for result in data.get("results", [])[:10]:
+                for result in data.get("results", []):
                     if result.get("title"):
                         results.append(f"- {result['title']}")
                     if result.get("content"):
-                        results.append(f"  {result['content'][:150]}...")
+                        results.append(f"  {result['content']}")
                     if result.get("url"):
                         results.append(f"  链接: {result['url']}")
                     results.append("")
@@ -488,7 +488,7 @@ class ExtendedToolExecutor:
                 text = '\n'.join(chunk for chunk in chunks if chunk)
 
                 if text:
-                    return f"URL 内容:\n{text[:5000]}"
+                    return f"URL 内容:\n{text}"
                 else:
                     return "Error: 无法从 URL 提取内容"
 
@@ -507,7 +507,7 @@ class ExtendedToolExecutor:
                 content = re.sub(r'\s+', ' ', content).strip()
 
                 if content:
-                    return f"URL 内容:\n{content[:5000]}"
+                    return f"URL 内容:\n{content}"
                 else:
                     return "Error: 无法从 URL 提取内容"
 

@@ -181,9 +181,13 @@ class FeishuChannel(BaseChannel):
 
             # Check if content is a file path
             import os
-            if msg.content.startswith("/") and os.path.isfile(msg.content):
+
+            # 展开路径并检查是否为文件
+            expanded_content = os.path.expanduser(msg.content)
+
+            if os.path.isfile(expanded_content):
                 # Send file directly
-                await self._send_file(msg.chat_id, msg.content, receive_id_type)
+                await self._send_file(msg.chat_id, expanded_content, receive_id_type)
             else:
                 # Send text message
                 content = json.dumps({"text": msg.content})
@@ -244,9 +248,9 @@ class FeishuChannel(BaseChannel):
                 'xlsx': 'xls',
             }
 
-            file_type = file_type_map.get(file_ext, 'stream')  # Default to 'stream' for unknown types
+            file_type = file_type_map.get(file_ext, 'stream')
 
-            print(f"📤 Uploading file: {file_name} ({file_size} bytes) [type: {file_type}]...")
+            print(f"📤 Uploading file: {file_name} ({file_size} bytes)...")
 
             # Upload file using multipart form data
             import requests
@@ -257,12 +261,16 @@ class FeishuChannel(BaseChannel):
                 "app_id": self.config.app_id,
                 "app_secret": self.config.app_secret
             }
-            auth_response = requests.post(auth_url, json=auth_data)
+            auth_response = requests.post(auth_url, json=auth_data, timeout=10)
+
             if not auth_response.ok:
                 print(f"❌ Failed to get access token: {auth_response.text}")
                 return
 
             access_token = auth_response.json().get("tenant_access_token")
+            if not access_token:
+                print(f"❌ Access token is empty")
+                return
 
             # Upload file
             upload_url = "https://open.feishu.cn/open-apis/im/v1/files"
@@ -276,19 +284,22 @@ class FeishuChannel(BaseChannel):
                     'file_type': (None, file_type),
                     'file_name': (None, file_name)
                 }
-                upload_response = requests.post(upload_url, headers=headers, files=files)
+                upload_response = requests.post(upload_url, headers=headers, files=files, timeout=30)
 
             if not upload_response.ok:
                 print(f"❌ Failed to upload file: {upload_response.text}")
                 return
 
             upload_data = upload_response.json()
+
             if upload_data.get("code") != 0:
                 print(f"❌ Upload error: {upload_data.get('msg')}")
                 return
 
             file_key = upload_data.get("data", {}).get("file_key")
-            print(f"✅ File uploaded! Key: {file_key}")
+            if not file_key:
+                print(f"❌ File key is empty")
+                return
 
             # Send file message
             content = json.dumps({"file_key": file_key})

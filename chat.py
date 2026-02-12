@@ -12,6 +12,7 @@ locale.setlocale(locale.LC_ALL, '')
 from agent.core.ai_engine import AIEngine
 from agent.core.extended_tool_executor import ExtendedToolExecutor
 from agent.core.skills import SkillsLoader
+from agent.core.memory_manager import MemoryManager
 from agent.bus.queue import MessageBus
 from agent.bus.events import OutboundMessage
 from agent.channels.manager import ChannelManager
@@ -27,6 +28,10 @@ class NaturalTaskExecutor:
     def __init__(self, bus: MessageBus | None = None):
         self.ai_engine = AIEngine()
 
+        # Initialize memory manager
+        memory_dir = Path(__file__).parent / "Memory"
+        self.memory_manager = MemoryManager(str(memory_dir))
+
         # Initialize skills loader
         workspace_path = Path(__file__).parent / "workspace"
         workspace_path.mkdir(exist_ok=True)
@@ -38,7 +43,7 @@ class NaturalTaskExecutor:
 
         self.execution_history = []
         self.step_count = 0
-        self.max_steps = 100
+        self.max_steps = 15  # 改为15步
         self.allow_all_commands = False  # 是否允许所有命令
         self.timer_triggered = False  # 定时器是否被触发
         self.waiting_for_timer = False  # 是否在等待定时器
@@ -54,7 +59,75 @@ class NaturalTaskExecutor:
         self.pending_context = None  # 待执行的上下文
         self.should_stop = False  # 是否应该停止当前任务
         self.web_search_count = 0  # 网络搜索计数
-        self.max_web_searches = 5  # 最多搜索 5 次
+        self.max_web_searches = 3  # 最多搜索 3 次
+        self.task_compression_summary = ""  # 当前任务的压缩摘要
+        # 从记忆文件加载累积的压缩摘要
+        self.accumulated_compression = self.memory_manager.load_accumulated_compression()
+        self.current_task_start_step = 0  # 当前任务的起始步骤
+        self.event_loop = None  # 事件循环（仅在网关模式下设置）
+
+    def _estimate_tokens(self, text: str) -> int:
+        """估算文本的token数量（基于实际测试优化）
+
+        根据实际反馈调整的系数：
+        - 中文字符：1个汉字 ≈ 1.6-1.8个token
+        - 英文单词：1个单词 ≈ 1.8-2.0个token
+        - 其他字符：包括标点、空格、特殊符号
+        """
+        import re
+
+        # 分离中文字符、英文单词和其他字符
+        chinese_chars = re.findall(r'[\u4e00-\u9fff]', text)
+        text_without_chinese = re.sub(r'[\u4e00-\u9fff]', '', text)
+        english_words = re.findall(r'\b[a-zA-Z]+\b', text_without_chinese)
+        other_chars = len(text) - len(chinese_chars) - sum(len(w) for w in english_words)
+
+        # 基于实际反馈优化的token估算
+        # 中文：1汉字 ≈ 1.7 token
+        chinese_tokens = int(len(chinese_chars) * 1.7)
+
+        # 英文：1单词 ≈ 1.9 tokens
+        english_tokens = int(len(english_words) * 1.9)
+
+        # 其他字符：2.5字符 ≈ 1 token
+        other_tokens = int(other_chars / 2.5) + 200  # 加上baseline和格式开销
+
+        total_tokens = chinese_tokens + english_tokens + other_tokens
+        return max(total_tokens, 1)
+
+    def _compress_and_notify(self, event_loop=None):
+        """在后台线程中执行压缩并通知用户"""
+        try:
+            # 压缩前估算token数
+            if self.execution_history:
+                history_text = "\n".join(self.execution_history)
+                tokens_before = self._estimate_tokens(history_text)
+            else:
+                tokens_before = 0
+
+            self._compress_current_task_manual()
+            print(f"✅ 任务历史已自动压缩 (清除了 {tokens_before} tokens)")
+
+            # 在网关模式下向飞书发送通知
+            if event_loop and self.is_gateway_mode and self.bus and self.current_channel and self.current_chat_id:
+                try:
+                    msg = f"✅ 任务历史已自动压缩 (清除了 {tokens_before} tokens)"
+                    coro = self._send_to_channel(msg)
+                    asyncio.run_coroutine_threadsafe(coro, event_loop)
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"⚠️ 自动压缩失败: {e}")
+
+    def _compress_current_task_async_wrapper(self):
+        """异步包装器，在子线程中执行压缩"""
+        try:
+            self._compress_current_task_manual()
+        except Exception as e:
+            print(f"压缩失败: {e}")
+            # 在网关模式下发送错误消息
+            if self.is_gateway_mode and self.bus and self.current_channel and self.current_chat_id:
+                asyncio.ensure_future(self._send_to_channel(f"⚠️ 压缩失败: {str(e)}"))
 
     def execute_task(self, user_request: str):
         """Execute task dynamically with natural flow"""
@@ -63,8 +136,16 @@ class NaturalTaskExecutor:
             self._clear_history()
             return
 
+        # Check for compact command (压缩历史记录)
+        if user_request.lower().strip() == "/compact":
+            self._compress_current_task_manual()
+            return
+
         # 重置搜索计数（每个新任务开始时）
         self.web_search_count = 0
+
+        # 记录用户请求到记忆文件
+        self.memory_manager.append_execution_step(f"【用户请求】{user_request}")
 
         # Build context from execution history
         context = self._build_context()
@@ -106,151 +187,75 @@ class NaturalTaskExecutor:
         desktop_path = Path.home() / "Desktop"
 
         # Build the prompt for this step
-        step_prompt = f"""你是 Minibot，一个轻量级的 AI 自动化工具，可以执行各种任务。
+        # 从 Agent.md 读取提示词模板
+        agent_md_path = Path(__file__).parent / "Agent.md"
 
-【系统信息】
-当前时间: {current_time}
-步骤: {self.step_count}/{self.max_steps}
-网络搜索次数: {self.web_search_count}/{self.max_web_searches}
+        # 读取 Agent.md 模板
+        with open(agent_md_path, 'r', encoding='utf-8') as f:
+            agent_template = f.read()
 
-【项目路径】
-项目根目录: {project_root}
-工作区目录: {workspace_path}
-内置 Skills: {builtin_skills_path}
-工作区 Skills: {workspace_skills_path}
-桌面路径: {desktop_path}
+        # 分离系统提示词和用户消息部分
+        # 系统提示词：从开头到【用户任务】之前
+        # 用户消息：从【用户任务】开始
+        split_marker = "【用户任务】"
+        split_idx = agent_template.find(split_marker)
 
-⚠️ 文件创建规则:
-- 最终输出文件 → {output_path}
-- 中间临时文件 → {temp_path}
-- 缓存数据 → {cache_path}
-- 不要在项目根目录或其他地方创建文件，除非用户明确指定
+        if split_idx >= 0:
+            system_prompt_template = agent_template[:split_idx]
+            user_message_template = agent_template[split_idx:]
+        else:
+            # 如果找不到分割点，全部作为系统提示词
+            system_prompt_template = agent_template
+            user_message_template = ""
 
-任务: {user_request}
+        # 替换系统提示词中的变量
+        system_prompt = system_prompt_template
+        system_prompt = system_prompt.replace('{step_count}', str(self.step_count))
+        system_prompt = system_prompt.replace('{max_steps}', str(self.max_steps))
+        system_prompt = system_prompt.replace('{step_count_minus_1}', str(self.step_count - 1))
+        system_prompt = system_prompt.replace('{steps_remaining}', str(self.max_steps - self.step_count + 1))
+        system_prompt = system_prompt.replace('{accumulated_compression}', self.accumulated_compression if self.accumulated_compression else "这是第一个任务")
 
-{context}
+        # 加载execution_history文件内容
+        execution_history_content = self.memory_manager.load_execution_history()
+        execution_history_text = "\n".join(execution_history_content) if execution_history_content else "还没有执行任何步骤"
+        system_prompt = system_prompt.replace('{execution_history}', execution_history_text)
 
-可用工具:
-- shell: 执行系统命令
-- file_read: 读取文本文件
-- file_write: 写入文件
-- file_list: 列出目录文件
-- file_delete: 删除文件
-- dir_create: 创建目录
-- dir_change: 切换目录
-- read_pdf: 读取PDF文件内容（支持.pdf, .docx等文档格式）
-- read_markdown: 读取Markdown文件
-- read_json: 读取JSON文件
-- search_files: 搜索文件
-- get_file_info: 获取文件信息
-- copy_file: 复制文件
-- move_file: 移动文件
-- create_file: 创建文件
-- web_search: 搜索网页信息
-- read_url: 读取URL内容
-- set_timer: 设置定时器（在指定分钟后触发）
-- send_file: 发送文件到飞书（仅在网关模式下可用）
-- generate_pdf: 将 Markdown/文本/HTML/Word 文档转换为 PDF
-- load_skill: 加载 skill 的完整内容（当需要详细指导时调用）
+        system_prompt = system_prompt.replace('{current_time}', current_time)
+        system_prompt = system_prompt.replace('{web_search_count}', str(self.web_search_count))
+        system_prompt = system_prompt.replace('{max_web_searches}', str(self.max_web_searches))
+        system_prompt = system_prompt.replace('{project_root}', str(project_root))
+        system_prompt = system_prompt.replace('{workspace_path}', str(workspace_path))
+        system_prompt = system_prompt.replace('{builtin_skills_path}', str(builtin_skills_path))
+        system_prompt = system_prompt.replace('{workspace_skills_path}', str(workspace_skills_path))
+        system_prompt = system_prompt.replace('{desktop_path}', str(desktop_path))
+        system_prompt = system_prompt.replace('{output_path}', str(output_path))
+        system_prompt = system_prompt.replace('{temp_path}', str(temp_path))
+        system_prompt = system_prompt.replace('{cache_path}', str(cache_path))
+        system_prompt = system_prompt.replace('{skills_summary}', skills_summary)
 
-## 可用的 Skills
+        # 替换用户消息中的变量
+        user_message = user_message_template
+        user_message = user_message.replace('{user_request}', user_request)
+        user_message = user_message.replace('{context}', context)
 
-{skills_summary}
+        # 调用 API 时分离传递系统提示词和用户消息
+        response = self.ai_engine.call_api(user_message, system_prompt=system_prompt)
 
-重要提示:
-- 如果任务涉及阅读文档（.pdf, .docx, .doc等），优先使用 read_pdf 工具
-- read_pdf 工具可以处理多种文档格式，包括Word文档
-- 如果任务涉及生成 PDF，使用 generate_pdf 工具（支持 markdown/text/html/docx 格式）
-- 如果任务还未完成，必须继续执行下一步
-- 只有当任务真正完成时才给出最终回应
-- 如果找到了任务所需的信息，使用它来进行下一步
-- 如果需要发送文件给用户，使用 send_file 工具（仅在网关模式下可用）
-
-## 如何使用 Skills
-
-查看上面的"可用的 Skills"列表，如果有相关 skill 可以帮助完成任务：
-
-1. **查看 skill 摘要**：从 XML 格式的 skills 列表中了解有哪些 skills 可用
-2. **主动加载 skill**：如果需要某个 skill 的详细内容和指导，使用 load_skill 工具
-3. **参考 skill 指导**：根据加载的 skill 内容中的最佳实践和示例来完成任务
-4. **读取 skill 文件**：可以使用 file_read 工具来读取 skill 目录中的任何文件（如 template.md、examples 等）
-
-### 使用 load_skill 的示例
-
-**例子1：需要 Web 搜索指导时**
-```
-接下来我要: 加载 web skill 来获取搜索技巧
-
-===== JSON START =====
-{{"action": "execute_tool", "tool": "load_skill", "params": {{"skill_name": "web"}}}}
-===== JSON END =====
-```
-
-**例子2：需要 GitHub 操作指导时**
-```
-接下来我要: 加载 github skill 来了解如何使用 gh 命令
-
-===== JSON START =====
-{{"action": "execute_tool", "tool": "load_skill", "params": {{"skill_name": "github"}}}}
-===== JSON END =====
-```
-
-**例子3：需要 Python 最佳实践时**
-```
-接下来我要: 加载 python skill 来参考编程最佳实践
-
-===== JSON START =====
-{{"action": "execute_tool", "tool": "load_skill", "params": {{"skill_name": "python"}}}}
-===== JSON END =====
-```
-
-⚠️ 防止重复搜索和无限循环:
-- 检查执行历史，不要重复执行相同的 web_search 或 read_url 操作
-- 如果已经搜索过某个关键词，不要再搜索相同内容
-- 网络搜索总次数不能超过 5 次，超过后必须基于已有信息给出结论
-- 如果发现自己在重复相同操作，立即改变策略或给出最终回应
-- 优先使用已获取的信息，而不是继续搜索
-
-⚠️ 临时文件清理规则:
-- 所有中间处理文件必须放在 {temp_path}
-- 任务完成时，系统会自动清理 {temp_path} 中的所有文件
-- 如果需要保留文件，必须移动到 {output_path}
-- 不要在项目根目录或其他地方创建临时文件
-
-你需要用自然语言描述接下来要做什么，然后给出JSON对象。
-
-格式如下:
-接下来我要: [自然语言描述你要做什么]
-
-===== JSON START =====
-{{"action": "execute_tool", "tool": "tool_name", "params": {{"param1": "value1"}}}}
-===== JSON END =====
-
-或者:
-接下来我要: [自然语言描述]
-
-===== JSON START =====
-{{"action": "respond", "response": "最终答案"}}
-===== JSON END =====
-
-例如:
-接下来我要: 读取Word文档的内容
-
-===== JSON START =====
-{{"action": "execute_tool", "tool": "read_pdf", "params": {{"path": "/Users/a1-6/Desktop/SuperAgent总纲(2).docx"}}}}
-===== JSON END =====
-
-重要: 必须使用 ===== JSON START ===== 和 ===== JSON END ===== 来包围JSON对象！
-
-现在开始，先用自然语言描述接下来要做什么，然后给出JSON对象。"""
-
-        response = self.ai_engine.call_api(step_prompt)
+        # 清空AI引擎的对话历史（已保存到执行历史文件）
+        self.ai_engine.clear_history()
 
         # 显示AI的回答
         print(response)
 
-        # 提取自然语言部分并发送到飞书
+        # 提取自然语言部分
         natural_language = self._extract_natural_language(response)
+
+        # 记录AI的自然语言响应到记忆文件
+        if natural_language:
+            self.memory_manager.append_execution_step(f"【AI响应】{natural_language}")
+
+        # 发送到飞书
         if natural_language and self.is_gateway_mode:
             # 使用 ensure_future 而不是 create_task 来避免 context 冲突
             asyncio.ensure_future(self._send_to_channel(f"🤖 {natural_language}"))
@@ -260,7 +265,7 @@ class NaturalTaskExecutor:
 
         if decision is None:
             # 如果多次重试都失败，继续下一步而不是停止
-            print(f"\n⚠️  无法解析响应，继续下一步...\n")
+            print("\n⚠️ 无法解析响应，继续下一步...\n")
             self.step_count += 1
             context = self._build_context()
             self._execute_step(user_request, context)
@@ -335,7 +340,13 @@ AI 想要执行以下操作：
         elif action == "respond":
             response_text = decision.get("response", "")
             print(f"\n{response_text}\n")
-            self.execution_history.append(f"最终回应: {response_text}")
+
+            # 记录最终回应到历史
+            history_entry = f"最终回应: {response_text}"
+            self.execution_history.append(history_entry)
+
+            # 同步保存到记忆文件（确保数据持久化）
+            self.memory_manager.append_execution_step(history_entry)
 
             # 清理大型搜索结果以节省上下文
             self._cleanup_large_results()
@@ -347,6 +358,47 @@ AI 想要执行以下操作：
             if self.bus and self.current_channel and self.current_chat_id:
                 asyncio.ensure_future(self._send_to_channel(response_text))
 
+            # 自动压缩任务记忆
+            if self.execution_history:
+                # 从文件中读取完整的近期记忆（不是内存中的片段）
+                all_history = self.memory_manager.load_execution_history()
+                if all_history:
+                    history_text = "\n".join(all_history)
+                    current_tokens = self._estimate_tokens(history_text)
+                else:
+                    # 如果文件为空，使用内存中的历史
+                    history_text = "\n".join(self.execution_history)
+                    current_tokens = self._estimate_tokens(history_text)
+
+                # 只有当超过30000 token时才压缩
+                if current_tokens > 30000:
+                    # 发送压缩提示
+                    compact_msg = f"⏳ 近期记忆已达 {current_tokens} tokens，正在压缩任务历史..."
+                    print(f"{compact_msg}")
+                    if self.bus and self.current_channel and self.current_chat_id:
+                        asyncio.ensure_future(self._send_to_channel(compact_msg))
+
+                    # 在后台线程中执行压缩（不等待）
+                    import threading
+
+                    # 获取事件循环（可能来自网关模式保存的 executor.event_loop）
+                    event_loop = getattr(self, 'event_loop', None)
+                    if not event_loop:
+                        try:
+                            event_loop = asyncio.get_running_loop()
+                        except RuntimeError:
+                            event_loop = None
+
+                    compression_thread = threading.Thread(
+                        target=self._compress_and_notify,
+                        args=(event_loop,),
+                        daemon=True
+                    )
+                    compression_thread.start()
+                else:
+                    # 近期记忆未超过限制，显示当前token数
+                    print(f"📊 近期记忆: {current_tokens}/30000 tokens")
+
         else:
             print(f"\n⚠️  未知操作: {action}，继续下一步...\n")
             self.step_count += 1
@@ -356,6 +408,92 @@ AI 想要执行以下操作：
     async def _execute_step_async(self, user_request: str, context: str):
         """Async wrapper for _execute_step to avoid nested asyncio issues"""
         self._execute_step(user_request, context)
+
+    def _compress_current_task_manual(self) -> None:
+        """Manually compress the current execution history into a summary"""
+
+        # 从记忆文件加载执行历史
+        execution_history = self.memory_manager.load_execution_history()
+
+        if not execution_history:
+            print("⚠️  没有执行历史可以压缩\n")
+            return
+
+        # 先调用AI生成简短摘要，确保成功后再保存
+        history_text = "\n".join(execution_history)
+        step_count = len(execution_history)
+        summary_prompt = f"""请以简洁的表格形式总结以下执行过程：
+
+【执行步骤】（共 {step_count} 步）
+{history_text}
+
+请生成一个表格，包含以下列：
+- 用户问题
+- 步骤
+- 操作描述
+- 工具/命令
+- 执行结果
+
+格式：
+| 用户问题 | 步骤 | 操作 | 工具/命令 | 结果 |
+|---------|------|------|---------|------|
+| [用户的问题] | 1 | [描述] | [工具名] | [结果] |
+| | 2 | [描述] | [工具名] | [结果] |
+
+要求：
+1. 用户问题只在第一行填写，后续行留空
+2. 每一步对应一行
+3. 表格简洁清晰，突出关键信息
+4. 不要省略任何重要步骤
+
+表格："""
+
+        try:
+            task_summary = self.ai_engine.call_api(summary_prompt)
+
+            # 清空AI引擎的对话历史（已保存到执行历史文件）
+            self.ai_engine.clear_history()
+
+            # 检查AI是否成功返回摘要（不是错误信息）
+            if not task_summary or task_summary.strip() == "":
+                print("⚠️ AI未能生成摘要，压缩取消\n")
+                return
+            if task_summary.startswith("API Error:") or "Error:" in task_summary:
+                print(f"⚠️ AI调用错误，压缩取消\n")
+                return
+
+        except Exception as e:
+            print(f"⚠️ AI调用失败，压缩取消\n")
+            return
+
+        # 只有AI成功返回摘要，才保存完整的执行历史到存档文件夹（按日期组织）
+        archive_path = self.memory_manager.save_compression_archive(history_text)
+
+        # 构建完整的存档路径（绝对路径）
+        full_archive_path = str(self.memory_manager.memory_dir / archive_path)
+
+        # 添加到累积压缩摘要（新的压缩添加到前面，包含存档路径和简短摘要）
+        if self.accumulated_compression:
+            # 新的压缩摘要添加到前面，包含存档路径和简短摘要（不显示编号）
+            self.accumulated_compression = f"{task_summary}\n📁 详细内容: {full_archive_path}\n\n{self.accumulated_compression}"
+        else:
+            self.accumulated_compression = f"{task_summary}\n📁 详细内容: {full_archive_path}"
+
+        # 保存到记忆文件
+        self.memory_manager.save_accumulated_compression(self.accumulated_compression)
+
+        # 彻底清空 AIEngine 的对话历史以减少上下文
+        # 压缩摘要已经保存到文件，不需要再保留在内存中
+        self.ai_engine.clear_history()
+
+        # 清空执行历史（内存和文件）
+        self.execution_history = []
+        self.step_count = 0
+
+        # 清除执行历史文件（已压缩，不再需要）
+        self.memory_manager.clear_execution_history()
+
+        print(f"✅ 历史记录已压缩并保存到记忆文件\n📁 存档位置: {full_archive_path}\n")
 
     def _truncate_response(self, response: str, max_length: int = 50) -> str:
         """截断长响应，超过max_length的部分用省略号表示"""
@@ -444,28 +582,86 @@ AI 想要执行以下操作：
                 # 首先尝试直接解析
                 try:
                     decision = json.loads(json_str)
+
+                    # 自动修复：如果action不是execute_tool或respond，尝试修复
+                    if decision.get("action") not in ["execute_tool", "respond"]:
+                        # 检查是否是工具名称被当作action
+                        possible_tool = decision.get("action")
+                        if "params" in decision:
+                            # 这看起来像是工具调用，修复为正确格式
+                            decision = {
+                                "action": "execute_tool",
+                                "tool": possible_tool,
+                                "params": decision.get("params", {})
+                            }
+
                     return decision
                 except json.JSONDecodeError as e:
                     # 如果失败，尝试修复常见问题
                     error_pos = e.pos if hasattr(e, 'pos') else 0
 
-                    # 修复策略1：处理未转义的引号（在字符串值中）
-                    # 查找 "response": " 后面的内容，转义其中的引号
+                    # 修复策略1：处理content字段中的未转义引号
+                    # 对于content字段中的HTML/长文本，需要特殊处理
                     json_str = re.sub(
-                        r'("response"\s*:\s*")((?:[^"\\]|\\.)*?)(")',
+                        r'("content"\s*:\s*")((?:[^"\\]|\\.)*?)(")',
                         lambda m: m.group(1) + m.group(2).replace('"', '\\"') + m.group(3),
-                        json_str
+                        json_str,
+                        flags=re.DOTALL
                     )
 
                     try:
                         decision = json.loads(json_str)
+
+                        # 自动修复：如果action不是execute_tool或respond，尝试修复
+                        if decision.get("action") not in ["execute_tool", "respond"]:
+                            possible_tool = decision.get("action")
+                            if "params" in decision:
+                                decision = {
+                                    "action": "execute_tool",
+                                    "tool": possible_tool,
+                                    "params": decision.get("params", {})
+                                }
+
                         return decision
                     except json.JSONDecodeError:
                         # 修复策略2：处理 HTML 内容中的引号
                         json_str = re.sub(r'(?<=[a-zA-Z0-9])"(?=[a-zA-Z0-9=])', '\\"', json_str)
 
-                        decision = json.loads(json_str)
-                        return decision
+                        try:
+                            decision = json.loads(json_str)
+
+                            # 自动修复：如果action不是execute_tool或respond，尝试修复
+                            if decision.get("action") not in ["execute_tool", "respond"]:
+                                possible_tool = decision.get("action")
+                                if "params" in decision:
+                                    decision = {
+                                        "action": "execute_tool",
+                                        "tool": possible_tool,
+                                        "params": decision.get("params", {})
+                                    }
+
+                            return decision
+                        except json.JSONDecodeError:
+                            # 修复策略3：尝试找到最后一个完整的JSON对象
+                            # 从后往前找，确保JSON是完整的
+                            for i in range(len(json_str) - 1, 0, -1):
+                                if json_str[i] == '}':
+                                    try:
+                                        decision = json.loads(json_str[:i+1])
+
+                                        # 自动修复：如果action不是execute_tool或respond，尝试修复
+                                        if decision.get("action") not in ["execute_tool", "respond"]:
+                                            possible_tool = decision.get("action")
+                                            if "params" in decision:
+                                                decision = {
+                                                    "action": "execute_tool",
+                                                    "tool": possible_tool,
+                                                    "params": decision.get("params", {})
+                                                }
+
+                                        return decision
+                                    except json.JSONDecodeError:
+                                        continue
 
             except json.JSONDecodeError as e:
                 if attempt == max_retries - 1:
@@ -489,7 +685,10 @@ AI 想要执行以下操作：
             if self.web_search_count >= self.max_web_searches:
                 result = f"⚠️ 已达到网络搜索限制({self.max_web_searches}次)，请基于已有信息给出结论"
                 print(f"\n执行结果:\n{result}\n")
-                self.execution_history.append(f"执行 {tool_name}: {result}")
+                history_entry = f"执行 {tool_name}: {result}"
+                self.execution_history.append(history_entry)
+                # 保存到记忆文件
+                self.memory_manager.append_execution_step(history_entry)
                 return
             self.web_search_count += 1
 
@@ -502,13 +701,24 @@ AI 想要执行以下操作：
         # 如果是发送文件，在网关模式下处理
         if tool_name == "send_file":
             if self.is_gateway_mode and self.bus and self.current_channel and self.current_chat_id:
-                file_path = params.get("path", "")
+                file_path = params.get("path", "") or params.get("file_path", "")
                 result = self._send_file_to_channel(file_path)
             else:
                 result = "❌ send_file 工具仅在网关模式下可用"
             print(f"\n执行结果:\n{result}\n")
-            self.execution_history.append(f"执行 {tool_name}: {result}")
+            history_entry = f"执行 {tool_name}: {result}"
+            self.execution_history.append(history_entry)
+            # 保存到记忆文件
+            self.memory_manager.append_execution_step(history_entry)
             return
+
+        # 如果是生成PDF，处理参数映射（支持 input/input_path 和 output/output_path 两种方式）
+        if tool_name == "generate_pdf":
+            params["input_path"] = params.get("input_path", "") or params.get("input", "")
+            params["output_path"] = params.get("output_path", "") or params.get("output", "")
+            # 移除旧参数，避免混淆
+            params.pop("input", None)
+            params.pop("output", None)
 
         # Execute the tool
         tool_call = {"tool": tool_name, "params": params}
@@ -517,8 +727,12 @@ AI 想要执行以下操作：
         # 显示执行结果
         print(f"\n执行结果:\n{result}\n")
 
-        # Record in history - 保存完整结果
-        self.execution_history.append(f"执行 {tool_name}: {result}")
+        # 完整保存到记忆（不截断）
+        history_entry = f"执行 {tool_name}: {result}"
+        self.execution_history.append(history_entry)
+
+        # 同步保存到记忆文件（确保下一步能读到）
+        self.memory_manager.append_execution_step(history_entry)
 
         # 如果设置了定时器，等待其触发
         if tool_name == "set_timer" and self.waiting_for_timer:
@@ -678,41 +892,31 @@ AI 想要执行以下操作：
             return f"得到结果: {result_preview}"
 
     def _build_context(self) -> str:
-        """Build context from execution history"""
-        if not self.execution_history:
-            return "还没有执行任何步骤。"
+        """Build context from memory files and accumulated compression"""
 
-        context = "之前的执行过程:\n"
-        # 保留完整的执行历史，不截断
-        for entry in self.execution_history:
-            context += f"- {entry}\n"
+        context_parts = []
 
-        return context
+        # 添加累积的压缩摘要
+        if self.accumulated_compression:
+            context_parts.append("【之前的任务摘要】")
+            context_parts.append(self.accumulated_compression)
+            context_parts.append("")
+
+        # 从记忆文件加载当前执行历史
+        execution_history = self.memory_manager.load_execution_history()
+        if execution_history:
+            context_parts.append("【当前任务执行过程】")
+            for entry in execution_history:
+                context_parts.append(f"- {entry}")
+        else:
+            context_parts.append("还没有执行任何步骤。")
+
+        return "\n".join(context_parts)
 
     def _cleanup_large_results(self) -> None:
         """Clean up large results from web_search and read_url to reduce context size"""
-        cleaned_history = []
-        for entry in self.execution_history:
-            # Check if this is a web_search or read_url result
-            if "执行 web_search:" in entry or "执行 read_url:" in entry:
-                # Extract tool name and result
-                if "执行 web_search:" in entry:
-                    prefix = "执行 web_search:"
-                else:
-                    prefix = "执行 read_url:"
-
-                result = entry[len(prefix):].strip()
-
-                # 截断到300字符
-                if len(result) > 300:
-                    summary = result[:300] + "... [内容已截断以节省上下文]"
-                    cleaned_history.append(f"{prefix} {summary}")
-                else:
-                    cleaned_history.append(entry)
-            else:
-                cleaned_history.append(entry)
-
-        self.execution_history = cleaned_history
+        # 不再截断任何结果，保留完整内容
+        pass
 
     def _cleanup_temp_files(self) -> None:
         """Automatically clean up temporary files after task completion"""
@@ -759,7 +963,14 @@ AI 想要执行以下操作：
         # Reset command approval state
         self.allow_all_commands = False
 
-        print("✅ 历史会话已清除\n")
+        # 清空压缩摘要链
+        self.accumulated_compression = ""
+        self.task_compression_summary = ""
+
+        # 清除记忆文件
+        self.memory_manager.clear_all()
+
+        print("✅ 历史会话已清除，记忆文件已删除\n")
 
     def _send_file_to_channel(self, file_path: str) -> str:
         """Send file to channel via message bus."""
@@ -772,14 +983,31 @@ AI 想要执行以下操作：
 
             # Expand path
             expanded_path = os.path.expanduser(file_path)
+
             if not expanded_path.startswith("/"):
                 expanded_path = os.path.expanduser("~") + "/" + expanded_path
 
             if not os.path.isfile(expanded_path):
-                return f"❌ 文件不存在: {file_path}"
+                # 提供更详细的错误信息
+                error_msg = f"❌ 文件不存在\n"
+                error_msg += f"   原始路径: {file_path}\n"
+                error_msg += f"   展开路径: {expanded_path}\n"
+                error_msg += f"   路径存在: {os.path.exists(expanded_path)}\n"
+
+                # 检查父目录
+                parent_dir = os.path.dirname(expanded_path)
+                if os.path.exists(parent_dir):
+                    error_msg += f"   父目录存在: ✓\n"
+                    error_msg += f"   父目录内容: {os.listdir(parent_dir)[:5]}"
+                else:
+                    error_msg += f"   父目录存在: ✗ ({parent_dir})"
+
+                return error_msg
 
             file_size = os.path.getsize(expanded_path)
             file_name = os.path.basename(expanded_path)
+
+            print(f"✅ 文件找到 - 名称: {file_name}, 大小: {file_size} bytes")
 
             # Create OutboundMessage with file path
             # The Feishu channel will detect it's a file and handle it
@@ -794,7 +1022,9 @@ AI 想要执行以下操作：
 
             return f"✅ 文件已发送: {file_name} ({file_size} bytes)"
         except Exception as e:
-            return f"❌ 发送文件出错: {str(e)}"
+            import traceback
+            error_trace = traceback.format_exc()
+            return f"❌ 发送文件出错:\n{error_trace}"
 
     async def _send_to_channel(self, content: str) -> None:
         """Send response to channel via message bus."""
@@ -865,6 +1095,9 @@ async def gateway_mode():
 
     # Create executor with bus
     executor = NaturalTaskExecutor(bus=bus)
+
+    # Save event loop for background compression notifications
+    executor.event_loop = asyncio.get_running_loop()
 
     # Start channels and message processing
     async def process_messages():
@@ -974,11 +1207,36 @@ async def gateway_mode():
                     await executor._send_to_channel("⏹️ 任务已停止")
                     continue
 
+                # Check for /compact command
+                if msg.content.lower().strip() == "/compact":
+                    # 显示当前记忆大小（从文件读取完整历史）
+                    all_history = executor.memory_manager.load_execution_history()
+                    if all_history:
+                        history_text = "\n".join(all_history)
+                        current_tokens = executor._estimate_tokens(history_text)
+                        compact_msg = f"📊 近期记忆: {current_tokens} tokens，正在压缩..."
+                    else:
+                        compact_msg = "⏳ 正在压缩任务历史记录..."
+
+                    await executor._send_to_channel(compact_msg)
+                    # 在后台线程中执行压缩（不等待）
+                    import threading
+                    event_loop = asyncio.get_running_loop()
+                    compression_thread = threading.Thread(
+                        target=executor._compress_and_notify,
+                        args=(event_loop,),
+                        daemon=True
+                    )
+                    compression_thread.start()
+                    continue
+
                 # Reset execution state for new message
                 executor._cleanup_large_results()  # 清理上一个任务的大型网页结果
                 executor.ai_engine.truncate_web_results(max_length=300)  # 截断AI引擎对话历史中的网页结果
-                executor.execution_history = []
-                executor.step_count = 0
+                executor.ai_engine.clear_history()  # 清空AI引擎的对话历史
+                # 不清空 execution_history，让它积累所有任务的执行历史
+                # 直到用户输入 /compact 时才压缩
+                executor.step_count = 0  # 重置步数计数器（每个新任务重新开始计数）
                 executor.web_search_count = 0  # 重置搜索计数
                 executor.allow_all_commands = False
                 executor.should_stop = False
@@ -993,7 +1251,7 @@ async def gateway_mode():
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                print(f"❌ Error processing message: {e}")
+                print(f"❌ 处理消息错误: {e}")
 
     # Run channels and message processor concurrently
     try:
@@ -1042,13 +1300,32 @@ def main():
                 executor._clear_history()
                 continue
 
+            # Handle /compact command
+            if user_input.lower().strip() == "/compact":
+                # 显示当前记忆大小（从文件读取完整历史）
+                all_history = executor.memory_manager.load_execution_history()
+                if all_history:
+                    history_text = "\n".join(all_history)
+                    current_tokens = executor._estimate_tokens(history_text)
+                    print(f"📊 近期记忆: {current_tokens} tokens，正在压缩...\n")
+                else:
+                    print(f"⚠️  没有执行历史可以压缩\n")
+                executor._compress_current_task_manual()
+                # 压缩完成后显示用户提示
+                print("💡 你可以继续提问新的任务\n")
+                continue
+
             # 清理上一个任务的大型网页结果
             executor._cleanup_large_results()
             executor.ai_engine.truncate_web_results(max_length=300)  # 截断AI引擎对话历史中的网页结果
 
+            # 清空AI引擎的对话历史，为新任务开始做准备
+            executor.ai_engine.clear_history()
+
             # Reset for new task
-            executor.execution_history = []
-            executor.step_count = 0
+            # 不清空 execution_history，让它积累所有任务的执行历史
+            # 直到用户输入 /compact 时才压缩
+            executor.step_count = 0  # 重置步数计数器（每个新任务重新开始计数）
             executor.web_search_count = 0  # 重置搜索计数
             executor.allow_all_commands = False  # 重置命令允许状态
 
