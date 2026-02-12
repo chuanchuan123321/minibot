@@ -441,14 +441,14 @@ Minibot achieves **unlimited context capacity** through an intelligent compressi
 1. **Automatic Compression** (Manual via `/compact` command)
    - When task execution history exceeds 30,000 tokens, automatic compression is triggered
    - Or manually trigger with `/compact` command at any time
-   - Execution history is intelligently compressed into a concise summary table
-   - Complete history is archived with timestamp for future reference
+   - Execution history is intelligently compressed into ~1,000 tokens summary
+   - Complete history is archived with timestamp and referenced by pointer
 
-2. **Context Preservation**
-   - Compressed task summaries are accumulated and maintained
-   - Each new task can reference ALL previous task summaries
-   - AI makes decisions informed by entire project history
-   - No information loss, only reorganization for efficiency
+2. **Pointer-based Memory Storage**
+   - Compressed summaries stored with pointers to complete archived history
+   - Each task stores: compressed summary (~1,000 tokens) + pointer to full archive
+   - No information loss - complete history always accessible via pointer
+   - Accumulated compression chain builds up with task references only
 
 3. **Benefits**
 
@@ -456,8 +456,8 @@ Minibot achieves **unlimited context capacity** through an intelligent compressi
    |----------|-------------------|------------------|
    | 10 task chain | Context overloaded | ✅ All tasks remembered |
    | 100 task chain | Impossible | ✅ Unlimited tasks supported |
-   | Context per task | ~3000-4000 tokens | ✅ ~1000-1500 tokens (compressed) |
-   | Historical recall | Lost after few tasks | ✅ Full project memory maintained |
+   | Compression ratio | N/A | ✅ 30,000 tokens → ~1,000 tokens (97% reduction) |
+   | Historical recall | Lost after few tasks | ✅ Full project memory accessible via pointers |
 
 **Using the `/compact` Command:**
 
